@@ -1,0 +1,48 @@
+# Native projects are GENERATED artifacts (ADR-0001).
+# Never commit them, and never edit them directly — `expo prebuild` overwrites
+# them and the change is lost. All native config goes in app.config.ts.
+/android
+/ios
+
+# Dependencies
+/node_modules
+
+# Expo
+.expo/
+/dist
+web-build/
+expo-env.d.ts
+
+# Secrets — keys live in EAS Secrets, never in git (ADR-0003)
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+
+# Build output
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Testing
+coverage/
+
+# Metro
+.metro-health-check*
+
+# Editor / OS
+.DS_Store
+*.pem
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log

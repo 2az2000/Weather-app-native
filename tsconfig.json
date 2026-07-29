@@ -1,0 +1,48 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    // ── Strictness ────────────────────────────────────────────────────────────
+    // See CLAUDE.md §12. These are deliberately stricter than Expo's defaults.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // TypeScript 7 no longer auto-includes every package in node_modules/@types,
+    // so ambient test globals must be declared explicitly.
+    "types": ["jest", "node"],
+
+    // ── Path aliases ──────────────────────────────────────────────────────────
+    // Relative imports crossing a feature or layer boundary are forbidden
+    // (CLAUDE.md §14). Aliases make boundary violations visible and lintable.
+    //
+    // NOTE: TypeScript 7 removed `baseUrl`, so these must be relative paths
+    // with an explicit `./` prefix. Keep in sync with babel.config.js and
+    // jest.config.js `moduleNameMapper`.
+    "paths": {
+      "@/core/*": ["./src/core/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/shared/*": ["./src/shared/*"],
+      "@/theme/*": ["./src/theme/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios",
+    ".expo",
+    // Config files are plain CommonJS JS and are linted, not type-checked.
+    "eslint.config.js",
+    "babel.config.js",
+    "jest.config.js",
+    "jest.setup.js",
+    "commitlint.config.js"
+  ]
+}
