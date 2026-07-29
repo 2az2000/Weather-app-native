@@ -60,11 +60,27 @@ Buildable app with no features. Green CI. A deliberately-violating import fails 
 **Dependencies** — none.
 
 **Definition of Done**
-- [ ] `pnpm typecheck | lint | test` all pass
-- [ ] Dev client runs on a physical iOS **and** Android device
-- [ ] **A test import from `domain/` to `data/` fails lint** — proves enforcement is real, not aspirational
-- [ ] A non-conventional commit message is rejected by the hook
-- [ ] CI green on a PR
+- [x] `npm run typecheck | lint | test` all pass
+- [ ] Dev client runs on a physical iOS **and** Android device *(requires EAS build — not yet verified)*
+- [x] **A test import from `domain/` to `data/` fails lint** — proves enforcement is real, not aspirational
+- [x] A non-conventional commit message is rejected by the hook
+- [ ] CI green on a PR *(workflow written; needs a remote to run)*
+
+**Status: complete except device build + CI run**, both of which need
+infrastructure outside the repo (an EAS account and a git remote).
+
+Enforcement was verified with deliberate violation probes, each confirmed to
+fail lint and then deleted:
+
+| Probe | Result |
+|---|---|
+| `domain/` importing `data/` | ✅ `boundaries/element-types` |
+| `domain/` importing `axios` / `react-native` | ✅ `no-restricted-imports` |
+| `presentation/` importing `data/` | ✅ `boundaries/element-types` |
+| Cross-feature deep import | ✅ `boundaries/element-types` |
+| `core/` importing a feature | ✅ `boundaries/element-types` |
+| `marginLeft` / `paddingRight` / `left` | ✅ `no-restricted-syntax` |
+| `any`, `console.log`, TS `enum` | ✅ respective rules |
 
 ---
 

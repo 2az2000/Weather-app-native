@@ -1000,7 +1000,7 @@ Before requesting review:
 - [ ] PR title follows Conventional Commits
 - [ ] Description states **what** changed, **why**, and **how it was verified**
 - [ ] Screenshots or screen recording for any UI change — **light and dark, English and Persian**
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` all pass locally
+- [ ] `npm run typecheck`, `npm run lint`, `npm test` all pass locally
 - [ ] No `.only`, no commented-out code, no debug logging
 - [ ] No new dependency without justification in the description
 - [ ] No secrets, keys, or `.env` files in the diff
@@ -1234,12 +1234,17 @@ interface PollenCardProps {
 
 ### Daily loop
 ```bash
-pnpm start              # dev server (dev client)
-pnpm typecheck          # tsc --noEmit
-pnpm lint               # eslint, incl. boundary + RTL rules
-pnpm test               # jest
-pnpm test:watch
+npm start                # dev server (dev client)
+npm run typecheck        # tsc --noEmit
+npm run lint             # eslint, incl. boundary + RTL rules
+npm run format:check     # prettier
+npm test                 # jest
+npm run test:watch
 ```
+
+> **Installing dependencies requires `npm install --legacy-peer-deps`.** See the
+> pinned-version constraints below — several packages in the Expo SDK 57
+> ecosystem have not yet widened their peer ranges.
 
 ### Pre-commit
 Husky + lint-staged run ESLint and Prettier on staged files; Commitlint validates the message. **Never bypass with `--no-verify`** — if a hook fails, fix the cause.
@@ -1250,12 +1255,30 @@ Husky + lint-staged run ESLint and Prettier on staged files; Commitlint validate
 ### CI gates — all required to merge
 `typecheck` · `lint` (incl. architecture boundaries) · `test` · build
 
+### ⚠️ Pinned versions — do not upgrade without reading this
+
+Three versions are deliberately held back. Each was verified empirically during
+Phase 0; upgrading any of them breaks the build.
+
+| Package | Pinned | Why | Unblock when |
+|---|---|---|---|
+| **TypeScript** | `6.0.3` | `typescript-eslint` **hard-errors** on TS 7 — it does not merely warn. Since the entire architecture enforcement (§32, ADR-0007) runs through typescript-eslint, lint outranks having the newest compiler. | `typescript-eslint` ships TS 7 support ([issue #10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)) |
+| **Jest** | `29.x` | `jest-expo@57` is built against Jest 29. With Jest 30, `jest-environment-node@29` creates a v29 `ModuleMocker` that `jest-runtime@30` cannot use — every suite fails with `clearMocksOnScope is not a function`. | `jest-expo` targets Jest 30 |
+| **react-dom** | `19.2.3` | Must match `react` exactly. npm otherwise resolves the latest, which demands a newer React than Expo SDK 57 pins. | React version changes with the SDK |
+
+`npm install` therefore requires `--legacy-peer-deps`. This is recorded in CI.
+
+**New Architecture note:** Fabric/TurboModules is the *only* architecture in
+SDK 57 / RN 0.86 — `newArchEnabled` no longer exists as a config option. Every
+native dependency must be New Architecture compatible; there is no fallback.
+
 ### Adding a dependency
 1. Justify it in the PR description
 2. Check maintenance status and bundle size
 3. Confirm New Architecture (Fabric/TurboModules) compatibility
 4. If it needs native code, confirm a config plugin exists
 5. Pin the exact version
+6. Run `npx expo install --check` to confirm SDK alignment
 
 ---
 
