@@ -2,6 +2,8 @@
 
 > **What actually happened, phase by phase.**
 >
+> 🌐 نسخهٔ فارسی: [IMPLEMENTATION-LOG.fa.md](IMPLEMENTATION-LOG.fa.md)
+>
 > [CLAUDE.md](../CLAUDE.md) says how the code *should* be written. [ROADMAP.md](../ROADMAP.md) says what gets built and in what order. **This file records what was built, what broke, and why each decision went the way it did.**
 >
 > It exists because the most expensive knowledge on a project is the kind that gets rediscovered: a version that cannot be upgraded, a lint rule that silently does nothing, a test that passes for the wrong reason. Each of those below cost real time to find. None of them should cost that time twice.
@@ -14,6 +16,7 @@
 - **Record every problem that cost more than a few minutes**, even if the fix was one line. The fix is rarely the valuable part — the *symptom* and the *diagnosis* are, because that is what a future reader will search for.
 - **Record deliberate scope changes with their reasoning**, so "why isn't X done yet?" has an answer.
 - **Write it as the phase happens**, not afterwards. Reconstructed logs lose exactly the detail that makes them useful.
+- **Update both language versions together**, so they cannot drift apart.
 
 ---
 

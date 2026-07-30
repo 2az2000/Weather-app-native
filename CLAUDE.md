@@ -957,6 +957,8 @@ Rule of thumb: if a test breaks when you rename a private variable, it is testin
   | `CLAUDE.md` | *How* code must be written |
   | `ROADMAP.md` | *What* gets built, in what order, and when it is done |
   | [`docs/IMPLEMENTATION-LOG.md`](docs/IMPLEMENTATION-LOG.md) | *What actually happened* — problems hit, fixes applied, versions pinned and why |
+
+  The implementation log is maintained in English and Persian ([`.fa.md`](docs/IMPLEMENTATION-LOG.fa.md)). **Update both in the same commit** — a translation that lags is a second source of truth that quietly goes stale.
 - **ADRs for load-bearing decisions** in `docs/adr/`, numbered sequentially, never deleted. A superseded ADR is marked `Superseded by ADR-XXXX` and kept — the reasoning history is the value.
 - **Comments explain *why*, never *what*.** The code says what.
   ```ts
