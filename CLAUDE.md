@@ -183,8 +183,9 @@ weather/
 │   │   ├── di/                   #   composition root — wires interfaces to impls
 │   │   ├── errors/               #   AppError union, Result<T, E>
 │   │   ├── i18n/                 #   i18next setup, RTL bootstrap, locale formatters
-│   │   ├── logger/               #   logging facade (Sentry / Reactotron sinks)
+│   │   ├── logger/               #   logging facade + pluggable sinks
 │   │   ├── network/              #   connectivity state, online/offline detection
+│   │   ├── query/                #   TanStack client, MMKV persister, cache version
 │   │   └── storage/              #   MMKV + SQLite drivers, migrations
 │   │
 │   ├── features/                 # Feature slices. Each is self-contained.
@@ -829,14 +830,22 @@ export type AppError =
 
 **Never call `console.log` in committed code.** Enforced by lint (error).
 
-Use the `core/logger` facade, which fans out to environment-appropriate sinks:
+Use the `core/logger` facade, which fans out to a list of **sinks**. Call sites
+depend on the `Logger` interface only, so adding a sink is a registration change
+in the composition root and touches no calling code.
 
 | Level | Use for | Dev | Prod |
 |---|---|---|---|
-| `debug` | Local tracing | Reactotron | dropped |
+| `debug` | Local tracing | console | dropped |
 | `info` | Lifecycle milestones | console | breadcrumb |
 | `warn` | Recoverable degradation (fallback provider engaged) | console | breadcrumb |
 | `error` | Failures needing attention | console | **Sentry** |
+
+**Sink status:** the console sink ships in Phase 1. The Sentry sink is registered
+in Phase 11, where its DSN, source maps, and release health are configured
+together. Reactotron implements the same `LogSink` interface and can be
+registered locally by a developer who wants it; it is not a build dependency,
+because it requires a running desktop companion app.
 
 Rules:
 - **Never log PII or secrets.** Coordinates are personal data — log a geohash at reduced precision, never a raw user position, and never an API key or token.

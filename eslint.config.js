@@ -124,6 +124,11 @@ module.exports = defineConfig([
 
       // A bare `catch {}` silently discards failures.
       'no-empty': ['error', { allowEmptyCatch: false }],
+
+      // False positive on libraries that expose both a default object and
+      // matching named exports — `axios.create()` is axios's documented factory,
+      // and the rule's suggested `import { create }` is not equivalent.
+      'import/no-named-as-default-member': 'off',
     },
   },
 

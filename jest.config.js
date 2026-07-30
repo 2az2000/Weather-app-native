@@ -29,12 +29,13 @@ module.exports = {
   ],
 
   coverageThreshold: {
-    // Raised per phase as layers are implemented (ROADMAP DoD).
-    global: {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0,
+    // A ratchet, not an aspiration: these are set just below current coverage so
+    // a regression fails CI. Raise them as each phase lands (ROADMAP DoD).
+    './src/core/': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
     },
   },
 

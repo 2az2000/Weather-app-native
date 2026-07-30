@@ -10,9 +10,10 @@ Feature-agnostic plumbing that every feature depends on. If two features would o
 | `config/` | Typed env access (validated at startup), constants, feature flags |
 | `di/` | Composition root — binds domain interfaces to data implementations |
 | `errors/` | `Result<T, E>`, the `AppError` union, helpers |
-| `i18n/` | i18next setup, `isRTL` accessor, RTL bootstrap, locale-aware formatters |
-| `logger/` | Logging facade with Reactotron (dev) and Sentry (prod) sinks |
+| `i18n/` | i18next setup, `isRTL` accessor, RTL bootstrap, locale-aware formatters *(Phase 2)* |
+| `logger/` | Logging facade with pluggable sinks; PII redaction |
 | `network/` | Connectivity state, online/offline observable |
+| `query/` | TanStack Query client, MMKV persister, cache versioning |
 | `storage/` | MMKV driver, SQLite driver, migration runner |
 
 ## Does NOT belong here
