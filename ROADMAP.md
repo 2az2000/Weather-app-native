@@ -2,6 +2,7 @@
 
 > Phased plan for building the application incrementally **without ever needing to redesign the architecture**.
 > Architecture rules live in [CLAUDE.md](CLAUDE.md). This file covers *what gets built, in what order, and when it is done*.
+> What actually happened during each phase — problems hit, fixes applied, versions pinned — is recorded in [docs/IMPLEMENTATION-LOG.md](docs/IMPLEMENTATION-LOG.md).
 
 ---
 
