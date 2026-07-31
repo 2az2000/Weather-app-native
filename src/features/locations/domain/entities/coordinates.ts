@@ -1,13 +1,14 @@
+import type { Coordinates } from '@/shared/types';
+
 /**
- * A point on Earth.
+ * `Coordinates` itself lives in `shared/types` — both this feature and weather
+ * need it, and a shared concept moves DOWN rather than sideways
+ * (CLAUDE.md §7 rule 3).
  *
- * Every weather query in the app is parameterized by this, which is why the
- * locations feature is built before the weather feature (ROADMAP Phase 3).
+ * The BEHAVIOUR over it stays here, because deciding whether a coordinate is
+ * valid or whether two points are the same place is a domain judgement.
  */
-export interface Coordinates {
-  readonly latitude: number;
-  readonly longitude: number;
-}
+export type { Coordinates };
 
 /** Latitude and longitude bounds. Outside these a value is not a coordinate. */
 const LATITUDE_RANGE = { min: -90, max: 90 } as const;

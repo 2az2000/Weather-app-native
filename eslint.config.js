@@ -188,6 +188,8 @@ module.exports = defineConfig([
         { type: 'core-di', pattern: 'src/core/di/**/*', mode: 'full' },
         { type: 'core-errors', pattern: 'src/core/errors/**/*', mode: 'full' },
         { type: 'core', pattern: 'src/core/**/*', mode: 'full' },
+        // Declared before the broad `shared` pattern — matched top-down.
+        { type: 'shared-types', pattern: 'src/shared/types/**/*', mode: 'full' },
         { type: 'shared', pattern: 'src/shared/**/*', mode: 'full' },
         { type: 'theme', pattern: 'src/theme/**/*', mode: 'full' },
       ],
@@ -214,7 +216,19 @@ module.exports = defineConfig([
             // happens to be defined once in `core/` so every layer shares it.
             {
               from: ['feature-domain'],
-              allow: [['feature-domain', { feature: '${from.feature}' }], 'core-errors'],
+              allow: [
+                ['feature-domain', { feature: '${from.feature}' }],
+                // `core/errors` and `shared/types` are the ONLY two things
+                // outside its own domain a feature's domain may import. Both are
+                // architecturally inert — pure types and value helpers with no
+                // dependencies, nothing to mock, no I/O.
+                //
+                // BEHAVIOUR gets no such exemption: `shared/utils` stays out of
+                // reach, which is why Phase 3 moved a geohash call in
+                // `SaveLocation` to the domain's own `distanceKm`.
+                'core-errors',
+                'shared-types',
+              ],
             },
 
             // ── data: implements domain interfaces ────────────────────────────
@@ -228,6 +242,7 @@ module.exports = defineConfig([
                 'core',
                 'core-errors',
                 'shared',
+                'shared-types',
                 'feature-barrel',
               ],
             },
@@ -270,11 +285,22 @@ module.exports = defineConfig([
             // still limited to feature BARRELS, so internals stay private.
             {
               from: ['core-di'],
-              allow: ['core', 'core-di', 'core-errors', 'shared', 'feature-barrel'],
+              allow: [
+                'core',
+                'core-di',
+                'core-errors',
+                'shared',
+                'shared-types',
+                'feature-barrel',
+              ],
             },
             { from: ['core'], allow: ['core', 'core-errors'] },
             { from: ['core-errors'], allow: ['core-errors'] },
-            { from: ['shared'], allow: ['core', 'core-errors', 'shared', 'theme'] },
+            {
+              from: ['shared'],
+              allow: ['core', 'core-errors', 'shared', 'shared-types', 'theme'],
+            },
+            { from: ['shared-types'], allow: ['shared-types'] },
             { from: ['theme'], allow: ['theme'] },
 
             // ── app: thin route files ─────────────────────────────────────────
@@ -288,6 +314,7 @@ module.exports = defineConfig([
                 'core-di',
                 'core-errors',
                 'shared',
+                'shared-types',
                 'theme',
               ],
             },
@@ -311,7 +338,15 @@ module.exports = defineConfig([
               allow: '**/*',
             },
             {
-              target: ['core', 'core-di', 'core-errors', 'shared', 'theme', 'app'],
+              target: [
+                'core',
+                'core-di',
+                'core-errors',
+                'shared',
+                'shared-types',
+                'theme',
+                'app',
+              ],
               allow: '**/*',
             },
           ],

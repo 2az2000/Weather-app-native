@@ -19,6 +19,8 @@
  * @see https://en.wikipedia.org/wiki/Geohash
  */
 
+import type { Coordinates } from '@/shared/types';
+
 /** Base-32 alphabet defined by the geohash standard. Not arbitrary — do not reorder. */
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
@@ -44,11 +46,6 @@ export const GEOHASH_PRECISION = {
   /** Coarser still, for logs. Deliberately too imprecise to locate a person. */
   logging: 3,
 } as const;
-
-export interface Coordinates {
-  readonly latitude: number;
-  readonly longitude: number;
-}
 
 /**
  * Encode coordinates as a geohash.

@@ -9,6 +9,7 @@ import {
   type KeyValueStorage,
   type Migration,
 } from '@/core/storage';
+import { RequestCoalescer } from '@/shared/utils';
 import {
   DeviceLocationDataSource,
   GetCurrentLocation,
@@ -23,6 +24,24 @@ import {
   locationsMigration,
   type LocationRepository,
 } from '@/features/locations';
+import {
+  AstronomyCalculator,
+  CircuitBreaker,
+  GetDailyForecast,
+  GetForecast,
+  GetHistoricalWeather,
+  GetHourlyForecast,
+  GetMinutelyForecast,
+  GetSevereAlerts,
+  OpenMeteoDataSource,
+  OpenWeatherDataSource,
+  RefreshForecast,
+  SqliteWeatherStore,
+  WeatherRepositoryImpl,
+  createUnavailableWeatherStore,
+  forecastSnapshotsMigration,
+  type WeatherRepository,
+} from '@/features/weather';
 
 /**
  * The composition root.
@@ -48,7 +67,7 @@ import {
  *
  * **Append only.** Never reorder or renumber a shipped migration.
  */
-const MIGRATIONS: readonly Migration[] = [locationsMigration];
+const MIGRATIONS: readonly Migration[] = [locationsMigration, forecastSnapshotsMigration];
 
 /** Use cases exposed to the presentation layer. */
 export interface LocationUseCases {
@@ -57,6 +76,17 @@ export interface LocationUseCases {
   readonly reverseGeocode: ReverseGeocode;
   readonly saveLocation: SaveLocation;
   readonly reorderLocations: ReorderLocations;
+}
+
+/** Weather use cases exposed to the presentation layer. */
+export interface WeatherUseCases {
+  readonly getForecast: GetForecast;
+  readonly refreshForecast: RefreshForecast;
+  readonly getHourlyForecast: GetHourlyForecast;
+  readonly getDailyForecast: GetDailyForecast;
+  readonly getMinutelyForecast: GetMinutelyForecast;
+  readonly getHistoricalWeather: GetHistoricalWeather;
+  readonly getSevereAlerts: GetSevereAlerts;
 }
 
 export interface Container {
@@ -76,6 +106,15 @@ export interface Container {
   readonly locationRepository: LocationRepository;
   readonly locations: LocationUseCases;
   readonly deviceLocation: DeviceLocationDataSource;
+
+  readonly weatherRepository: WeatherRepository;
+  readonly weather: WeatherUseCases;
+  /**
+   * Sun and moon, computed on-device.
+   *
+   * Stateless and I/O-free (ADR-0008), so one instance is shared.
+   */
+  readonly astronomy: AstronomyCalculator;
 }
 
 /**
@@ -113,6 +152,23 @@ export async function createContainer(): Promise<Container> {
     logger,
   );
 
+  // ── Weather ────────────────────────────────────────────────────────────────
+  // One coalescer and one breaker for the whole app: both are only useful if
+  // every caller shares the same instance.
+  const coalescer = new RequestCoalescer();
+  const breaker = new CircuitBreaker(logger);
+
+  const weatherRepository = new WeatherRepositoryImpl(
+    new OpenMeteoDataSource(api.openMeteoForecast, api.openMeteoArchive, logger),
+    new OpenWeatherDataSource(api.openWeather, logger),
+    database === undefined
+      ? createUnavailableWeatherStore()
+      : new SqliteWeatherStore(database),
+    breaker,
+    coalescer,
+    logger,
+  );
+
   return {
     env,
     logger,
@@ -120,6 +176,18 @@ export async function createContainer(): Promise<Container> {
     network,
     api,
     database,
+
+    weatherRepository,
+    astronomy: new AstronomyCalculator(),
+    weather: {
+      getForecast: new GetForecast(weatherRepository),
+      refreshForecast: new RefreshForecast(weatherRepository),
+      getHourlyForecast: new GetHourlyForecast(weatherRepository),
+      getDailyForecast: new GetDailyForecast(weatherRepository),
+      getMinutelyForecast: new GetMinutelyForecast(weatherRepository),
+      getHistoricalWeather: new GetHistoricalWeather(weatherRepository),
+      getSevereAlerts: new GetSevereAlerts(weatherRepository),
+    },
 
     locationRepository,
     deviceLocation,

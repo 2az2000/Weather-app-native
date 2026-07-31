@@ -268,14 +268,39 @@ Complete, tested weather data layer. Verified through tests only.
 **Dependencies** — Phases 1, 3.
 
 **Definition of Done**
-- [ ] Every metric in the brief is retrievable: temp, feels-like, humidity, pressure, visibility, wind speed/direction/gust, dew point, UV, sunrise/sunset, moon phase
-- [ ] Both providers map into **identical entity shapes** — proven by a test asserting equivalence on the same location
-- [ ] Circuit breaker tested: forced Open-Meteo failure routes to OpenWeather and recovers after cooldown
-- [ ] Repository returns **stale cached data when offline** rather than an error
-- [ ] Request coalescing tested — 10 concurrent identical calls issue **one** HTTP request
-- [ ] `AstronomyCalculator` validated against known astronomical values, **with the network disabled**
-- [ ] Historical weather retrievable for an arbitrary past date
-- [ ] Domain coverage ≥ 95%; mapper coverage 100%
+- [x] Every metric in the brief is retrievable: temp, feels-like, humidity, pressure, visibility, wind speed/direction/gust, dew point, UV, sunrise/sunset, moon phase
+- [x] Both providers map into **identical entity shapes** — proven by a test asserting equivalence on the same location
+- [x] Circuit breaker tested: forced Open-Meteo failure routes to OpenWeather and recovers after cooldown
+- [x] Repository returns **stale cached data when offline** rather than an error
+- [x] Request coalescing tested — 10 concurrent identical calls issue **one** HTTP request
+- [x] `AstronomyCalculator` validated against known astronomical values, **with the network disabled**
+- [x] Historical weather retrievable for an arbitrary past date
+- [x] Domain coverage ≥ 95%; mappers 99.1% statements / **100% functions**
+
+**Status: complete.** 888 tests. No UI, as intended.
+
+Two bugs were caught by tests comparing against PUBLISHED reference values
+rather than against the implementation's own output:
+
+> **suncalc returns degrees, not radians.** Its widely-cited documentation
+> describes radians with a south-based azimuth; this build returns degrees with
+> a north-based azimuth. Converting as documented produced solar elevations of
+> **-758°**, which is geometrically impossible. Verified against known
+> positions: solar noon reads exactly 180.00 (due south).
+
+> **The two providers anchored a "day" differently.** Open-Meteo stamps a daily
+> entry at local midnight, OpenWeather at roughly local noon. Left alone, the
+> same calendar day carried two different dates and a day-grouped list would
+> have shifted the moment failover happened.
+
+One architectural change, forced by the boundaries rule:
+
+> **`Coordinates` moved to `shared/types`.** The weather domain needed it and
+> was importing it from the locations feature barrel — a sideways dependency.
+> CLAUDE.md §7 rule 3 is explicit that a shared concept moves DOWN. `shared/types`
+> is now a distinct element type the domain may import, on the same reasoning as
+> `core/errors`: **types are shareable, behaviour is not.** `shared/utils` stays
+> out of the domain's reach.
 
 ---
 

@@ -24,11 +24,11 @@
 
 | | |
 |---|---|
-| **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations) |
-| **Next phase** | 4 — Weather Domain & Data |
-| **Source files** | 89 (excluding tests) |
-| **Test files** | 37 · 623 tests |
-| **Coverage** | `core/` 98.6% · locations domain & mappers 100% |
+| **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data) |
+| **Next phase** | 5 — Home Experience (the first screen) |
+| **Source files** | 118 (excluding tests) |
+| **Test files** | 48 · 888 tests |
+| **Coverage** | `core/` 98.6% · weather mappers 100% functions · locations domain 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
 ### Commits
@@ -505,6 +505,89 @@ Caught in the showcase screen. Hoisted to a module constant. The rule is right: 
 | Persian RTL review of both screens | Requires a running dev client |
 | GPS and permission flows on a real device | Simulator permission behaviour differs from a device |
 | Mapbox reverse-geocoding fallback | Phase 8, when the key exists |
+
+---
+
+## Phase 4 — Weather Domain & Data
+
+**Commit:** `<pending>`
+**Objective:** the heart of the product — entities, providers, mapping, caching and offline behaviour, with **no UI at all**.
+
+### Delivered
+
+| Layer | Contents |
+|---|---|
+| `domain/entities/` | Branded unit types (`Celsius`, `MetersPerSecond`, `Hectopascals`, `Meters`, `Degrees`, `Percent`, `Millimeters`), the shared `WeatherCondition` vocabulary, `SevereAlert`, and the five forecast entities |
+| `domain/services/` | `AstronomyCalculator` — sun times, position, time-of-day band, moon phase and illumination, computed on-device |
+| `domain/use-cases/` | `GetForecast`, `RefreshForecast`, `GetHourlyForecast`, `GetDailyForecast`, `GetMinutelyForecast`, `GetHistoricalWeather`, `GetSevereAlerts` |
+| `data/` | Zod-validated DTOs for both providers, one mapper each into the same entities, circuit breaker, SQLite store, migration `002_forecast_snapshots`, cache-first repository |
+| `shared/utils/` | `RequestCoalescer` |
+| `shared/types/` | `Coordinates`, promoted from the locations feature |
+
+**888 tests.** Mappers 99.1% statements / 100% functions; repositories 96.8%.
+
+### Problems encountered
+
+#### 1. suncalc returns DEGREES, not radians
+**Symptom:** a test asserting the geometric bound `-90 <= elevation <= 90` failed with **-758.98**.
+**Investigation:** suncalc's widely-cited documentation describes radians with a south-based azimuth. Probing the raw output against known positions showed otherwise — at solar noon in Tehran the azimuth reads exactly `180.00` and the altitude `77.75`. Both are only correct as DEGREES with a north-based bearing.
+**Resolution:** removed both conversions; the values are used as returned. The method now carries an explicit warning not to re-add a radian conversion.
+**Why it was caught:** the test compares against PUBLISHED astronomical facts — solar noon is due south, sunrise in June is north-east — rather than against this implementation's own output. A self-consistency test would have passed happily with a 758° sun.
+
+#### 2. The two providers anchored a "day" differently
+**Symptom:** the equivalence test reported `daily` differing between providers.
+**Cause:** Open-Meteo stamps a daily entry at local MIDNIGHT; OpenWeather stamps it at roughly local NOON.
+**Consequence if shipped:** the same calendar day would carry two different `date` values, so a day-grouped list or a chart x-axis would shift the moment failover happened — precisely when the user should notice nothing.
+**Resolution:** `toLocalMidnight` normalises OpenWeather's `dt` using the response's own `timezone_offset`.
+
+#### 3. `Coordinates` was a sideways dependency
+**Symptom:** `feature-domain is not allowed to import feature-barrel`, on every weather use case.
+**Cause:** the weather domain imported `Coordinates` from `@/features/locations`. Two features, one shared two-field record — CLAUDE.md §7 rule 3 says a shared concept moves DOWN, not sideways.
+**Resolution:** promoted to `shared/types`, which became a distinct `shared-types` element type the domain may import.
+**The principle that decided it:** **types are shareable, behaviour is not.** `shared/types` declares shapes with no runtime code and nothing to mock — architecturally inert, the same argument that lets `core/errors` reach the domain. `shared/utils` stays out of the domain's reach, which is why Phase 3 moved a geohash call in `SaveLocation` to the domain's own `distanceKm`.
+
+#### 4. A domain test reached into the data layer
+**Symptom:** `feature-domain is not allowed to import feature-data`, from the use-case tests importing DTO fixtures.
+**Resolution:** added `domain/__fixtures__/forecast.ts`, which builds ENTITIES directly rather than mapping from a wire shape.
+**Why the rule was right:** a use case's behaviour has nothing to do with a provider's wire format. The coupled test would have failed whenever a provider changed something the use case never sees — and it also forced `as never` casts to fabricate branded values, which the fixture builders now make unnecessary.
+
+#### 5. `exactOptionalPropertyTypes` again
+An optional property is not assignable to a parameter that merely allows absence. The precipitation helper needed `rain?: { '1h': number } | undefined` explicitly. Fifth occurrence across the project; the pattern is now familiar.
+
+#### 6. Two heredocs truncated silently
+Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and another cut mid-statement. The tests still reported PASS because the truncated file contained no complete test. **Verified file listings rather than trusting the exit code**, and switched to the file-writing tool for large content.
+
+### Verification
+
+| DoD item | How it was proven |
+|---|---|
+| Every metric retrievable | The data source test asserts every field is present in the request, since omitting one silently drops it from the response |
+| Identical entity shapes | Key sets compared across current, hourly, daily and minutely; scalar fields compared directly; only `provider` may differ |
+| Circuit breaker | Forced degradation routes to the fallback, SKIPS the primary on the next call, and recovers after an injected clock passes the cooldown |
+| Stale data when offline | Network failure with a six-hour-old cache returns the cache, not an error |
+| Request coalescing | Ten concurrent calls issue ONE request; a separate test proves drifting GPS fixes share the same cell key |
+| Astronomy offline | The whole suite runs with `fetch` throwing; polar day, polar night, and a full lunar cycle all validated against known values |
+| Historical weather | Fetched, cached, and served from cache when the range is fully covered |
+| Coverage | Mappers 100% functions; domain and repositories ratcheted in `jest.config.js` |
+
+### Deliberate scope decisions
+
+- **The circuit breaker ignores `network` and `timeout`.** Those mean the DEVICE is offline; failing over would hit the same wall and make the user wait through a second timeout. It also ignores `validation`, since a schema change would not be fixed by a provider with a different schema — and marking the provider down would hide a real bug.
+- **Forecasts are stored as a JSON blob.** A forecast is read and written whole; no query asks for "hour 7 of yesterday's response". The queryable parts — cell, kind, timestamp — are real indexed columns.
+- **The unavailable-store fallback silently succeeds on writes here**, unlike locations. A dropped cache entry costs a refetch; a dropped saved location loses something the user created.
+
+### Documentation kept in sync
+
+- **ROADMAP.md** — Phase 4 DoD marked with evidence, plus the two reference-value bugs and the `Coordinates` promotion
+- **eslint.config.js** — `shared-types` element type, with the types-versus-behaviour reasoning inline
+
+### Open items
+
+| Item | Blocker |
+|---|---|
+| Real provider responses as fixtures | Fixtures are hand-built to the documented schema; capturing live responses needs network access |
+| `local-weather-datasource` coverage | Thin SQLite wrapper; the risky logic (JSON revival, staleness) is covered, the delegation is not |
+| Hermes ICU confirmation for Jalali output | Carried over from Phase 2 — still needs a device |
 
 ---
 
