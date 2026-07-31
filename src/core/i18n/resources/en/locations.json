@@ -1,0 +1,32 @@
+{
+  "title": "Locations",
+  "search": {
+    "title": "Add a location",
+    "placeholder": "Search for a city",
+    "recent": "Recent searches",
+    "clearRecent": "Clear",
+    "noResults": "No cities matched \"{{query}}\"",
+    "hint": "Type at least two letters",
+    "resultLabel": "{{name}}, {{region}}"
+  },
+  "list": {
+    "empty": "No saved locations yet",
+    "emptyHint": "Add a city to see its forecast",
+    "add": "Add location",
+    "remove": "Remove {{name}}",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "currentLocation": "Current location",
+    "limitReached": "You can save up to {{count}} locations"
+  },
+  "permission": {
+    "title": "Use your location?",
+    "body": "Weather for where you are, without searching for it.",
+    "grant": "Allow location access",
+    "deniedTitle": "Location access is off",
+    "deniedBody": "You can still search for cities. Turn on location access to see weather where you are.",
+    "blockedBody": "Location access was turned off for this app. You can turn it back on in Settings.",
+    "openSettings": "Open Settings",
+    "skip": "Not now"
+  }
+}

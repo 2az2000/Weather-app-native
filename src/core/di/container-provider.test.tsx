@@ -1,11 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { noopLogger } from '@/core/logger';
-import { createFakeNetworkMonitor } from '@/core/network';
-import { createInMemoryKeyValueStorage } from '@/core/storage';
-
-import type { Container } from './container';
+import { createFakeContainer as fakeContainer } from './__tests__/fake-container';
 import { ContainerProvider, useContainer, useLogger } from './container-provider';
 
 /**
@@ -15,16 +11,6 @@ import { ContainerProvider, useContainer, useLogger } from './container-provider
  * dependency is injected, so a subtree can be rendered against test doubles with
  * no module mocking (CLAUDE.md §10, §26).
  */
-function fakeContainer(): Container {
-  return {
-    env: { openWeatherApiKey: '', mapboxAccessToken: '' },
-    logger: noopLogger,
-    storage: createInMemoryKeyValueStorage(),
-    network: createFakeNetworkMonitor(),
-    api: {} as Container['api'],
-    database: undefined,
-  };
-}
 
 function ShowsProvider() {
   const container = useContainer();

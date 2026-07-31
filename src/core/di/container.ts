@@ -7,7 +7,22 @@ import {
   openDatabase,
   type Database,
   type KeyValueStorage,
+  type Migration,
 } from '@/core/storage';
+import {
+  DeviceLocationDataSource,
+  GetCurrentLocation,
+  LocationRepositoryImpl,
+  RemoteGeocodingDataSource,
+  ReorderLocations,
+  ReverseGeocode,
+  SaveLocation,
+  SearchCities,
+  SqliteLocationStore,
+  createUnavailableLocationStore,
+  locationsMigration,
+  type LocationRepository,
+} from '@/features/locations';
 
 /**
  * The composition root.
@@ -17,11 +32,33 @@ import {
  * what allows a use case to be tested with a two-line fake instead of a mocking
  * framework.
  *
- * Feature repositories are bound here as their phases land: Phase 3 adds
- * `LocationRepository`, Phase 4 adds `WeatherRepository`. Each binds a domain
- * INTERFACE to a data implementation, which is the dependency inversion the whole
- * architecture rests on.
+ * This is the ONE module permitted to import feature barrels, because binding a
+ * domain interface to a data implementation requires seeing both. The boundaries
+ * config carves it out explicitly (ADR-0007); access is still limited to public
+ * barrels, so feature internals stay private.
  */
+
+/**
+ * The database's single ordered migration list.
+ *
+ * SQLite has one schema, so its version history is one list — but the table
+ * definitions belong to the features that own them. Each feature exports its
+ * migration and the ordering is assembled here, which keeps `core/storage`
+ * from importing `features/`.
+ *
+ * **Append only.** Never reorder or renumber a shipped migration.
+ */
+const MIGRATIONS: readonly Migration[] = [locationsMigration];
+
+/** Use cases exposed to the presentation layer. */
+export interface LocationUseCases {
+  readonly getCurrentLocation: GetCurrentLocation;
+  readonly searchCities: SearchCities;
+  readonly reverseGeocode: ReverseGeocode;
+  readonly saveLocation: SaveLocation;
+  readonly reorderLocations: ReorderLocations;
+}
+
 export interface Container {
   readonly env: Env;
   readonly logger: Logger;
@@ -35,6 +72,10 @@ export interface Container {
    * to MMKV-only operation rather than showing a fatal error (CLAUDE.md §24).
    */
   readonly database: Database | undefined;
+
+  readonly locationRepository: LocationRepository;
+  readonly locations: LocationUseCases;
+  readonly deviceLocation: DeviceLocationDataSource;
 }
 
 /**
@@ -53,10 +94,24 @@ export async function createContainer(): Promise<Container> {
   const network = createNetworkMonitor();
   const api = createApiClients(env, logger);
 
-  const database = await openDatabase(logger);
-  if (database.isErr()) {
-    logger.warn('di.database.unavailable', { kind: database.error.kind });
+  const opened = await openDatabase(logger, MIGRATIONS);
+  if (opened.isErr()) {
+    logger.warn('di.database.unavailable', { kind: opened.error.kind });
   }
+  const database = opened.isOk() ? opened.value : undefined;
+
+  // ── Locations ──────────────────────────────────────────────────────────────
+  const deviceLocation = new DeviceLocationDataSource(logger);
+
+  const locationRepository = new LocationRepositoryImpl(
+    deviceLocation,
+    new RemoteGeocodingDataSource(api.openMeteoGeocoding, logger),
+    // Search and GPS keep working without a database; only persistence degrades.
+    database === undefined
+      ? createUnavailableLocationStore()
+      : new SqliteLocationStore(database),
+    logger,
+  );
 
   return {
     env,
@@ -64,6 +119,16 @@ export async function createContainer(): Promise<Container> {
     storage,
     network,
     api,
-    database: database.isOk() ? database.value : undefined,
+    database,
+
+    locationRepository,
+    deviceLocation,
+    locations: {
+      getCurrentLocation: new GetCurrentLocation(locationRepository),
+      searchCities: new SearchCities(locationRepository),
+      reverseGeocode: new ReverseGeocode(locationRepository),
+      saveLocation: new SaveLocation(locationRepository),
+      reorderLocations: new ReorderLocations(locationRepository),
+    },
   };
 }

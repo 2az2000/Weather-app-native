@@ -57,6 +57,20 @@ module.exports = {
       lines: 95,
       statements: 95,
     },
+    // ROADMAP Phase 3 DoD: domain + mappers >= 95%. Both sit at 100%; the
+    // ratchet is set just below so a regression fails CI.
+    './src/features/locations/domain/': {
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    './src/features/locations/data/mappers/': {
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
     './src/shared/': {
       branches: 60,
       functions: 70,

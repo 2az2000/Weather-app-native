@@ -183,6 +183,10 @@ module.exports = defineConfig([
           mode: 'full',
           capture: ['feature'],
         },
+        // Declared before the broad `core` pattern, which would otherwise
+        // swallow them — element types are matched top-down.
+        { type: 'core-di', pattern: 'src/core/di/**/*', mode: 'full' },
+        { type: 'core-errors', pattern: 'src/core/errors/**/*', mode: 'full' },
         { type: 'core', pattern: 'src/core/**/*', mode: 'full' },
         { type: 'shared', pattern: 'src/shared/**/*', mode: 'full' },
         { type: 'theme', pattern: 'src/theme/**/*', mode: 'full' },
@@ -203,9 +207,14 @@ module.exports = defineConfig([
             // Depends on NOTHING. Not on data, not on presentation, not on
             // core, not on another feature. This is what keeps business logic
             // testable in plain Node with zero mocks.
+            // `core-errors` is the ONE exception: `Result` and `AppError` are
+            // pure TypeScript with no dependencies, and CLAUDE.md §6 and §22
+            // both show domain repository interfaces returning
+            // `Result<T, AppError>`. Errors-as-values is a domain concept that
+            // happens to be defined once in `core/` so every layer shares it.
             {
               from: ['feature-domain'],
-              allow: [['feature-domain', { feature: '${from.feature}' }]],
+              allow: [['feature-domain', { feature: '${from.feature}' }], 'core-errors'],
             },
 
             // ── data: implements domain interfaces ────────────────────────────
@@ -217,6 +226,7 @@ module.exports = defineConfig([
                 ['feature-domain', { feature: '${from.feature}' }],
                 ['feature-data', { feature: '${from.feature}' }],
                 'core',
+                'core-errors',
                 'shared',
                 'feature-barrel',
               ],
@@ -232,6 +242,8 @@ module.exports = defineConfig([
                 ['feature-domain', { feature: '${from.feature}' }],
                 ['feature-presentation', { feature: '${from.feature}' }],
                 'core',
+                'core-di',
+                'core-errors',
                 'shared',
                 'theme',
                 'feature-barrel',
@@ -251,15 +263,33 @@ module.exports = defineConfig([
             // ── core & shared: sit BELOW features ─────────────────────────────
             // Must never import from features. An import here inverts the
             // dependency graph.
-            { from: ['core'], allow: ['core'] },
-            { from: ['shared'], allow: ['core', 'shared', 'theme'] },
+            // ── the composition root: the one module allowed to know everything
+            // Binding domain interfaces to data implementations REQUIRES seeing
+            // both. Every DI container has this property; the alternative is
+            // scattering construction across the app, which is worse. Access is
+            // still limited to feature BARRELS, so internals stay private.
+            {
+              from: ['core-di'],
+              allow: ['core', 'core-di', 'core-errors', 'shared', 'feature-barrel'],
+            },
+            { from: ['core'], allow: ['core', 'core-errors'] },
+            { from: ['core-errors'], allow: ['core-errors'] },
+            { from: ['shared'], allow: ['core', 'core-errors', 'shared', 'theme'] },
             { from: ['theme'], allow: ['theme'] },
 
             // ── app: thin route files ─────────────────────────────────────────
             // May only reach features through their public barrels.
             {
               from: ['app'],
-              allow: ['app', 'feature-barrel', 'core', 'shared', 'theme'],
+              allow: [
+                'app',
+                'feature-barrel',
+                'core',
+                'core-di',
+                'core-errors',
+                'shared',
+                'theme',
+              ],
             },
           ],
         },
@@ -280,7 +310,10 @@ module.exports = defineConfig([
               target: ['feature-domain', 'feature-data', 'feature-presentation'],
               allow: '**/*',
             },
-            { target: ['core', 'shared', 'theme', 'app'], allow: '**/*' },
+            {
+              target: ['core', 'core-di', 'core-errors', 'shared', 'theme', 'app'],
+              allow: '**/*',
+            },
           ],
         },
       ],

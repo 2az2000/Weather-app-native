@@ -181,6 +181,7 @@ weather/
 │   │   ├── api/                  #   axios instance, interceptors, HTTP→AppError mapping
 │   │   ├── config/               #   env vars, constants, feature flags
 │   │   ├── di/                   #   composition root — wires interfaces to impls
+│   │                         #   ★ the ONE module allowed to import features ★
 │   │   ├── errors/               #   AppError union, Result<T, E>
 │   │   ├── i18n/                 #   i18next setup, RTL bootstrap, locale formatters
 │   │   ├── logger/               #   logging facade + pluggable sinks
@@ -255,7 +256,14 @@ weather/
 
 **Allowed imports:** other domain files, and pure utility libraries with no side effects (`dayjs`, `suncalc`).
 
-**Forbidden imports:** `react`, `react-native`, `axios`, `expo-*`, `@tanstack/*`, `zustand`, `zod`, anything from `data/` or `presentation/`.
+**Forbidden imports:** `react`, `react-native`, `axios`, `expo-*`, `@tanstack/*`, `zustand`, `zod`, anything from `data/` or `presentation/`, and anything in `core/` **except `core/errors`**.
+
+> **Why `core/errors` is the one exception:** `Result` and `AppError` are pure
+> TypeScript with no dependencies, and errors-as-values is a *domain* concept
+> that happens to be defined once so every layer shares one taxonomy. A
+> repository interface returning `Result<T, AppError>` is the documented shape
+> (§10, §22). Enforced as a distinct `core-errors` element type in the
+> boundaries config.
 
 > **Why:** the moment domain imports React, business logic can no longer be tested in a plain Node process, reasoned about independently, or reused by a widget or background task. This constraint is what makes everything else testable.
 
@@ -764,7 +772,7 @@ Read `isRTL` from `core/i18n`, never from `I18nManager` directly in a component.
 
 ### Lists
 - **FlashList everywhere**, never `FlatList` or `ScrollView.map()` for dynamic data.
-- Provide accurate `estimatedItemSize` — a wrong estimate defeats the point.
+- **FlashList v2 measures items automatically** — `estimatedItemSize` was removed and passing it is a type error. On v1 an accurate estimate was mandatory; on v2 there is nothing to supply.
 - List items are `React.memo` with stable, non-index keys.
 - Never create inline objects/arrays/functions in `renderItem` — new identities every frame kill memoization.
 
@@ -1001,7 +1009,7 @@ Rule of thumb: if a test breaks when you rename a private variable, it is testin
 **Errors & performance**
 - [ ] Failures return `AppError`; no bare `catch {}`; no `console.log`
 - [ ] Offline path works with cached data
-- [ ] FlashList with accurate `estimatedItemSize`; no inline objects in `renderItem`
+- [ ] FlashList (not FlatList); no inline objects in `renderItem`
 - [ ] Animations on `transform`/`opacity`, worklets on the UI thread
 
 **Tests & docs**

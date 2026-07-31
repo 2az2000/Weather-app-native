@@ -50,7 +50,7 @@ describe('openDatabase', () => {
   it('opens the database under the configured name', async () => {
     useDb(fakeDb());
 
-    await openDatabase(noopLogger, 'test.db');
+    await openDatabase(noopLogger, [], 'test.db');
 
     expect(openDatabaseAsync).toHaveBeenCalledWith('test.db');
   });
@@ -60,7 +60,7 @@ describe('openDatabase', () => {
       const db = fakeDb();
       useDb(db);
 
-      await openDatabase(noopLogger, 'test.db');
+      await openDatabase(noopLogger, [], 'test.db');
 
       expect(db.execAsync).toHaveBeenCalledWith('PRAGMA journal_mode = WAL');
     });
@@ -69,7 +69,7 @@ describe('openDatabase', () => {
       const db = fakeDb();
       useDb(db);
 
-      await openDatabase(noopLogger, 'test.db');
+      await openDatabase(noopLogger, [], 'test.db');
 
       expect(db.execAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
     });
@@ -79,7 +79,7 @@ describe('openDatabase', () => {
     it('returns a storage AppError rather than throwing when opening fails', async () => {
       openDatabaseAsync.mockRejectedValue(new Error('disk is full'));
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
 
       expect(result.isErr()).toBe(true);
       expect(result.isErr() && result.error).toMatchObject({
@@ -92,7 +92,7 @@ describe('openDatabase', () => {
       openDatabaseAsync.mockRejectedValue(new Error('disk is full'));
       const error = jest.fn();
 
-      await openDatabase({ ...noopLogger, error }, 'test.db');
+      await openDatabase({ ...noopLogger, error }, [], 'test.db');
 
       expect(error).toHaveBeenCalledWith(
         'storage.database.openFailed',
@@ -109,7 +109,7 @@ describe('openDatabase', () => {
       });
       useDb(db);
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
 
       expect(result.isErr()).toBe(true);
       expect(db.closeAsync).toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('openDatabase', () => {
       const db = fakeDb();
       useDb(db);
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
       expect(result.isOk()).toBe(true);
       if (!result.isOk()) return;
 
@@ -142,7 +142,7 @@ describe('openDatabase', () => {
     it('returns the transaction callback’s value, which expo-sqlite discards', async () => {
       useDb(fakeDb());
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
       if (!result.isOk()) throw new Error('expected an open database');
 
       await expect(result.value.withTransaction(async () => 'committed')).resolves.toBe(
@@ -153,7 +153,7 @@ describe('openDatabase', () => {
     it('preserves an undefined return without confusing it for "did not run"', async () => {
       useDb(fakeDb());
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
       if (!result.isOk()) throw new Error('expected an open database');
 
       await expect(
@@ -169,7 +169,7 @@ describe('openDatabase', () => {
         }),
       );
 
-      const result = await openDatabase(noopLogger, 'test.db');
+      const result = await openDatabase(noopLogger, [], 'test.db');
       if (!result.isOk()) throw new Error('expected an open database');
 
       await expect(result.value.withTransaction(async () => 'x')).rejects.toThrow(

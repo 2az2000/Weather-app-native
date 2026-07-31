@@ -1,8 +1,10 @@
 import enCommon from './en/common.json';
 import enErrors from './en/errors.json';
+import enLocations from './en/locations.json';
 import enSettings from './en/settings.json';
 import faCommon from './fa/common.json';
 import faErrors from './fa/errors.json';
+import faLocations from './fa/locations.json';
 import faSettings from './fa/settings.json';
 
 /**
@@ -15,13 +17,23 @@ import faSettings from './fa/settings.json';
  * `errorMessageKey()` in `core/errors` a total function: every error variant is
  * guaranteed to have a user-facing translation (CLAUDE.md §22 rule 4).
  */
-export const NAMESPACES = ['common', 'errors', 'settings'] as const;
+export const NAMESPACES = ['common', 'errors', 'settings', 'locations'] as const;
 
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const DEFAULT_NAMESPACE: Namespace = 'common';
 
 export const resources = {
-  en: { common: enCommon, errors: enErrors, settings: enSettings },
-  fa: { common: faCommon, errors: faErrors, settings: faSettings },
+  en: {
+    common: enCommon,
+    errors: enErrors,
+    settings: enSettings,
+    locations: enLocations,
+  },
+  fa: {
+    common: faCommon,
+    errors: faErrors,
+    settings: faSettings,
+    locations: faLocations,
+  },
 } as const;

@@ -11,8 +11,7 @@ import {
 } from '@/core/errors';
 import type { Logger } from '@/core/logger';
 
-import { MIGRATIONS } from './migrations';
-import { runMigrations, type MigrationTarget } from './migration-runner';
+import { runMigrations, type Migration, type MigrationTarget } from './migration-runner';
 
 /**
  * SQLite — the durable, queryable tier (ADR-0004).
@@ -82,12 +81,19 @@ async function runInTransaction<T>(
 /**
  * Open the database, apply pragmas, and run pending migrations.
  *
+ * Migrations are PASSED IN rather than imported. SQLite has a single schema, so
+ * its version history is one ordered list — but the table definitions belong to
+ * the features that own them. Importing them here would make `core/` depend on
+ * `features/`, inverting the dependency graph (ADR-0007). The composition root
+ * assembles the list instead; that is what a composition root is for.
+ *
  * @returns The database handle, or a `storage` {@link AppError} if opening or
  *   migrating failed. Callers decide whether to degrade to MMKV-only operation —
  *   a corrupt cache must not prevent the app from starting.
  */
 export async function openDatabase(
   logger: Logger,
+  migrations: readonly Migration[],
   name: string = DATABASE_NAME,
 ): Promise<Result<Database, AppError>> {
   const opened = await fromPromise(SQLite.openDatabaseAsync(name), (cause) => {
@@ -108,7 +114,7 @@ export async function openDatabase(
   await db.execAsync('PRAGMA journal_mode = WAL');
   await db.execAsync('PRAGMA foreign_keys = ON');
 
-  const migrated = await runMigrations(toMigrationTarget(db), MIGRATIONS, logger);
+  const migrated = await runMigrations(toMigrationTarget(db), migrations, logger);
   if (migrated.isErr()) {
     await db.closeAsync();
     return err(migrated.error);

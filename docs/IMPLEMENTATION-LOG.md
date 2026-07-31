@@ -24,11 +24,11 @@
 
 | | |
 |---|---|
-| **Phases complete** | 0 (Foundation), 1 (Core Infrastructure), 2 (Design System, Theme, i18n & RTL) |
-| **Next phase** | 3 — Locations |
-| **Source files** | 60 (excluding tests) |
-| **Test files** | 30 · 518 tests |
-| **Coverage** | 95.9% statements overall · `core/` 98.6% |
+| **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations) |
+| **Next phase** | 4 — Weather Domain & Data |
+| **Source files** | 89 (excluding tests) |
+| **Test files** | 37 · 623 tests |
+| **Coverage** | `core/` 98.6% · locations domain & mappers 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
 ### Commits
@@ -412,6 +412,99 @@ Caught in the showcase screen. Hoisted to a module constant. The rule is right: 
 | On-device screen-reader pass | Requires a running dev client |
 | Visual four-combination review | `/showcase` exists for it; needs a device |
 | Jalali output confirmed under Hermes | Node ICU is not Hermes ICU; must be checked on device |
+
+---
+
+## Phase 3 — Locations
+
+**Commit:** `<pending>`
+**Objective:** the location capability every weather query is parameterized by.
+
+### Delivered
+
+| Layer | Contents |
+|---|---|
+| `domain/` | `Coordinates`, `Place`, `LocationSearchResult`, `SavedLocation`; `LocationRepository` interface; five use cases carrying real rules (minimum query length, duplicate detection, the saved-list cap, permutation validation) |
+| `data/` | Open-Meteo geocoding source with Zod-validated DTOs, `expo-location` GPS + OS reverse geocoding, SQLite store, repository impl, migration `001_locations` |
+| `presentation/` | Query-key factory, eight hooks (three with optimistic updates), permission prompt, location row, search row, list and search screens |
+| `shared/utils/` | **Geohash quantization** — the utility every cache key in the app depends on |
+| `core/i18n/` | `locations` namespace in English and Persian |
+
+**623 tests.** Locations domain and mappers both at **100%**, ratcheted in `jest.config.js`.
+
+### Problems encountered
+
+#### 1. The boundaries rule rejected the migration registry — correctly
+**Symptom:** `core is not allowed to import feature-data`, on a `MIGRATIONS` list in `core/storage` that imported the locations migration.
+**Cause:** SQLite has ONE schema, so its version history must be one ordered list — and I put that list in `core/`, which made `core/` depend on `features/`.
+**First instinct, rejected:** a comment calling it "a deliberate exception". That was a rationalization; the rule exists precisely to prevent this.
+**Resolution:** inverted the dependency. `openDatabase` now RECEIVES its migration list, each feature exports its own migration through its barrel, and the composition root assembles the order. `core/storage` no longer knows any feature exists.
+**Lesson:** when an enforced rule blocks you, the first question is whether the CODE is wrong — not the rule. Here it was.
+
+#### 2. The composition root genuinely does need to see everything
+**Symptom:** with the registry moved, `core/di/container.ts` now imported `@/features/locations` — same rule, same failure.
+**Cause:** binding a domain interface to a data implementation requires seeing both. That is what composition means, and every DI container has this property.
+**Resolution:** `core/di` became its own element type, allowed to import feature BARRELS and nothing deeper. Documented in the config and in CLAUDE.md §5.
+**Why this one IS a legitimate carve-out, unlike #1:** the alternative is scattering construction across the app, which is strictly worse; and access stays limited to public barrels, so feature internals remain private.
+
+#### 3. A lint rule was itself wrong
+**Symptom:** `feature-domain is not allowed to import core`, on every use case and the repository interface.
+**Investigation:** they import `Result` and `AppError` from `core/errors`. But CLAUDE.md §6 and §22 BOTH show a domain repository interface returning `Result<T, AppError>` — so the rule contradicted the documented architecture it was supposed to enforce.
+**Resolution:** `core/errors` is now a distinct `core-errors` element type that `feature-domain` may import. Nothing else in `core/` is reachable from domain. CLAUDE.md §6 now states the exception and why.
+**Lesson:** CLAUDE.md §31 says to change a rule in a PR when it blocks the right outcome. Distinguishing that case from #1 is the actual skill — the question is whether the rule or the code better matches the documented intent.
+
+#### 4. A reference-value test caught a geohash edge case
+**Symptom:** `geohash({ latitude: 90, longitude: 180 })` returned `bpbpb`, not the standard's `zzzzz`.
+**Cause:** the longitude normaliser wrapped unconditionally, and `((180 + 180) % 360 + 360) % 360 - 180` is `-180`. The same meridian geographically, but the opposite end of the geohash range.
+**Resolution:** values already inside `[-180, 180]` are returned untouched; only genuinely out-of-range values wrap.
+**Why it was caught:** the test compares against PUBLISHED reference values rather than against this implementation's own output. A self-consistency test would have passed happily.
+
+#### 5. FlashList v2 removed `estimatedItemSize`
+**Symptom:** `Property 'estimatedItemSize' does not exist` on both list screens.
+**Cause:** v2 measures items automatically; the prop was removed rather than deprecated.
+**Resolution:** removed from both screens, and CLAUDE.md §21 corrected — it previously mandated "an accurate `estimatedItemSize`", which is now impossible to supply.
+
+#### 6. A hand-written container literal broke when the container grew
+**Symptom:** `container-provider.test.tsx` failed to compile after three members were added to `Container`.
+**Resolution:** extracted `createFakeContainer()` into `core/di/__tests__/`, with per-member overrides. One place to update instead of every suite that renders a subtree.
+**Lesson worth generalising:** a test double for a growing interface belongs in one shared place from the start, not copied per file.
+
+#### 7. `distanceKm` replaced a geohash call in the domain
+**Symptom:** `feature-domain is not allowed to import shared`, from `SaveLocation` using `isSameCell` for duplicate detection.
+**Resolution:** switched to `distanceKm`, which already exists in the domain, with an explicit 5 km threshold.
+**Why this is better than loosening the rule:** "the same city" is a domain judgement, and a distance threshold says that plainly. Reaching for a cache-key utility described the intent less honestly and would have coupled the domain to `shared/`.
+
+### Verification
+
+| DoD item | How it was proven |
+|---|---|
+| GPS resolves to a readable place name | Repository test covers the success path and the degraded path where reverse geocoding fails but coordinates survive |
+| Denied vs permanently denied | `PermissionPrompt` renders a Settings link for `blocked` and a retry for `denied`, because requesting again when the OS will not prompt is a button that visibly does nothing |
+| Search debounced, cached 30 days, Persian | 350 ms debounce at the input; `STALE_TIME.geocoding`; locale is part of the query key, so switching language cannot serve cached English names |
+| Reorder optimistic with rollback | Mutation snapshots the list, applies the new order immediately, and restores the exact previous array on failure |
+| **Geohash quantization** | Four simulated drifting GPS fixes produce ONE key; a test also demonstrates that raw floats would produce two |
+| Domain + mapper coverage >= 95% | Both 100%, with ratchets so a regression fails CI |
+
+### Deliberate scope decisions
+
+- **Reordering is up/down buttons, not drag-only.** A drag gesture is invisible to a screen reader and hard to perform with a motor impairment. The same operation stays available to everyone.
+- **A corrupt database costs persistence, not the app.** `createUnavailableLocationStore` fails writes EXPLICITLY — silently accepting a save the user would never get back is worse than saying it failed — while degrading optional reads to empty. Search and GPS keep working.
+- **Mapbox reverse geocoding is deferred to Phase 8**, when its key and the map integration land. The OS geocoder needs no key, works offline, and already returns names in the device language.
+
+### Documentation kept in sync
+
+- **CLAUDE.md §6** — the `core/errors` exception to domain purity, and why
+- **CLAUDE.md §5** — `core/di` marked as the one module allowed to import features
+- **CLAUDE.md §21** — FlashList v2 correction
+- **ROADMAP.md** — Phase 3 DoD with evidence and the two architectural corrections
+
+### Open items
+
+| Item | Blocker |
+|---|---|
+| Persian RTL review of both screens | Requires a running dev client |
+| GPS and permission flows on a real device | Simulator permission behaviour differs from a device |
+| Mapbox reverse-geocoding fallback | Phase 8, when the key exists |
 
 ---
 
