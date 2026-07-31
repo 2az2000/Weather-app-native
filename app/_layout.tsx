@@ -1,25 +1,36 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, useColorScheme, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { I18nextProvider } from 'react-i18next';
 
 import { ContainerProvider, createContainer, type Container } from '@/core/di';
+import { createI18n, isNativeRTL, LOCALE_META } from '@/core/i18n';
 import {
   createQueryClient,
   createQueryPersister,
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,
 } from '@/core/query';
+import { usePreferencesStore } from '@/features/settings';
+import { ThemeProvider, type ColorScheme } from '@/theme';
 
 /**
  * Root layout — the app's composition point.
  *
  * Route files stay thin (CLAUDE.md §17); this one holds the provider stack and
- * nothing else. Theme, i18n, and the RTL bootstrap join it in Phase 2.
+ * nothing else. It is also where cross-cutting concerns are COMPOSED: `theme/`
+ * imports nothing and `core/i18n` knows nothing about preferences, so this is
+ * the only place that knows all three (CLAUDE.md §7 rule 5).
  */
 export default function RootLayout() {
   const [container, setContainer] = useState<Container>();
   const [startupError, setStartupError] = useState<Error>();
+
+  const themeMode = usePreferencesStore((state) => state.themeMode);
+  const locale = usePreferencesStore((state) => state.locale);
+  const systemScheme = useColorScheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +53,10 @@ export default function RootLayout() {
     };
   }, []);
 
+  const i18n = useMemo(() => createI18n(locale), [locale]);
+
+  const queryClient = useMemo(() => createQueryClient(), []);
+
   const persistOptions = useMemo(
     () =>
       container === undefined
@@ -54,25 +69,46 @@ export default function RootLayout() {
     [container],
   );
 
-  const queryClient = useMemo(() => createQueryClient(), []);
+  // `useColorScheme()` can also report 'unspecified' or null, so narrow rather
+  // than assuming it is always 'light' | 'dark'.
+  const scheme: ColorScheme =
+    themeMode === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : themeMode;
+
+  // Direction comes from the NATIVE layout engine, not from the selected locale.
+  // Until the app restarts they can disagree, and rendering against the locale
+  // would mirror text inside an unmirrored layout (ADR-0006).
+  const isRTL = isNativeRTL();
 
   if (startupError !== undefined) {
     return <StartupErrorScreen error={startupError} />;
   }
 
-  // Rendering nothing for one frame is correct here: the native splash screen is
-  // still up, and MMKV hydration is synchronous once the container exists, so
-  // there is no spinner to show.
+  // Rendering nothing for one frame is correct: the native splash is still up,
+  // and MMKV hydration is synchronous once the container exists, so there is no
+  // spinner to show.
   if (container === undefined || persistOptions === undefined) {
     return null;
   }
 
   return (
-    <ContainerProvider container={container}>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </PersistQueryClientProvider>
-    </ContainerProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ContainerProvider container={container}>
+        <I18nextProvider i18n={i18n}>
+          <ThemeProvider
+            scheme={scheme}
+            script={LOCALE_META[locale].script}
+            isRTL={isRTL}
+          >
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={persistOptions}
+            >
+              <Stack screenOptions={{ headerShown: false }} />
+            </PersistQueryClientProvider>
+          </ThemeProvider>
+        </I18nextProvider>
+      </ContainerProvider>
+    </GestureHandlerRootView>
   );
 }
 

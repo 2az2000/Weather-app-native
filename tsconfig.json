@@ -25,10 +25,17 @@
     // NOTE: TypeScript 7 removed `baseUrl`, so these must be relative paths
     // with an explicit `./` prefix. Keep in sync with babel.config.js and
     // jest.config.js `moduleNameMapper`.
+    // Both the bare specifier and the subpath are mapped. Without the bare
+    // form, `import { useTheme } from '@/theme'` fails to resolve while
+    // `@/theme/tokens/radii` succeeds — a confusing partial failure.
     "paths": {
+      "@/core": ["./src/core"],
       "@/core/*": ["./src/core/*"],
+      "@/features": ["./src/features"],
       "@/features/*": ["./src/features/*"],
+      "@/shared": ["./src/shared"],
       "@/shared/*": ["./src/shared/*"],
+      "@/theme": ["./src/theme"],
       "@/theme/*": ["./src/theme/*"]
     }
   },

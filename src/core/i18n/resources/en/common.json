@@ -1,0 +1,25 @@
+{
+  "appName": "Weather",
+  "actions": {
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "search": "Search",
+    "refresh": "Refresh"
+  },
+  "state": {
+    "loading": "Loading",
+    "empty": "Nothing here yet",
+    "offline": "You're offline",
+    "offlineDetail": "Showing saved data from {{time}}",
+    "updatedAt": "Updated {{time}}"
+  },
+  "a11y": {
+    "loadingContent": "Content is loading",
+    "closeSheet": "Close panel",
+    "back": "Go back"
+  }
+}

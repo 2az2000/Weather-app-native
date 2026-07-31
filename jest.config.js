@@ -9,6 +9,12 @@
 module.exports = {
   preset: 'jest-expo',
 
+  // Reanimated 4 moved its worklet runtime into react-native-worklets, whose
+  // `.native` entry points require a JSI binding that does not exist in Node.
+  // This official resolver strips the `.native` extension so the plain JS
+  // implementation is used instead.
+  resolver: 'react-native-worklets/jest/resolver',
+
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
   moduleNameMapper: {
@@ -17,6 +23,10 @@ module.exports = {
     '^@/features/(.*)$': '<rootDir>/src/features/$1',
     '^@/shared/(.*)$': '<rootDir>/src/shared/$1',
     '^@/theme/(.*)$': '<rootDir>/src/theme/$1',
+    '^@/core$': '<rootDir>/src/core',
+    '^@/features$': '<rootDir>/src/features',
+    '^@/shared$': '<rootDir>/src/shared',
+    '^@/theme$': '<rootDir>/src/theme',
   },
 
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
@@ -26,6 +36,10 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/**/index.ts',
     '!src/**/__fixtures__/**',
+    // Test helpers, not production code.
+    '!src/**/__tests__/**',
+    // Development-only gallery, redirected away in production builds.
+    '!src/shared/ui/showcase/**',
   ],
 
   coverageThreshold: {
@@ -36,6 +50,18 @@ module.exports = {
       functions: 95,
       lines: 95,
       statements: 95,
+    },
+    './src/theme/': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    './src/shared/': {
+      branches: 60,
+      functions: 70,
+      lines: 75,
+      statements: 75,
     },
   },
 

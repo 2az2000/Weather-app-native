@@ -1,9 +1,9 @@
 /**
  * Babel configuration.
  *
- * Path aliases are declared in BOTH tsconfig.json (for the type checker and the
- * editor) and here (for the bundler at runtime). They must be kept in sync — if
- * they drift, code type-checks but fails to resolve at runtime.
+ * Path aliases are declared in THREE places — tsconfig.json (type checker and
+ * editor), here (bundler), and jest.config.js (tests). They must be kept in
+ * sync; if they drift, code type-checks but fails to resolve at runtime.
  */
 module.exports = function (api) {
   api.cache(true);
@@ -15,6 +15,8 @@ module.exports = function (api) {
         'module-resolver',
         {
           root: ['./'],
+          // module-resolver matches these as PREFIXES, so a single entry
+          // covers both `@/theme` and `@/theme/tokens/radii`.
           alias: {
             '@/core': './src/core',
             '@/features': './src/features',
@@ -24,8 +26,11 @@ module.exports = function (api) {
           extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
         },
       ],
-      // react-native-reanimated/plugin must remain LAST once Reanimated is
-      // added in Phase 2. Adding plugins after it silently breaks worklets.
+
+      // MUST BE LAST. Reanimated 4 moved the worklet transform into
+      // react-native-worklets — `react-native-reanimated/plugin` no longer
+      // exists. Any plugin listed after this one silently breaks worklets.
+      'react-native-worklets/plugin',
     ],
   };
 };

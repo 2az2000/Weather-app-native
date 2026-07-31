@@ -1,0 +1,21 @@
+{
+  "title": "Settings",
+  "appearance": {
+    "title": "Appearance",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "Match device"
+  },
+  "language": {
+    "title": "Language",
+    "restartTitle": "Restart required",
+    "restartBody": "Changing the layout direction needs a restart to apply correctly.",
+    "restartConfirm": "Restart now",
+    "restartLater": "Not now"
+  },
+  "attribution": {
+    "title": "Data sources",
+    "openMeteo": "Weather data by Open-Meteo (CC BY 4.0)"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "network": "No internet connection. Check your network and try again.",
+  "timeout": "The request took too long. Try again.",
+  "rateLimit": "Too many requests right now. Try again shortly.",
+  "providerDegraded": "The weather service is having trouble. Showing what we have.",
+  "notFound": "We couldn't find that.",
+  "validation": "The weather service returned something unexpected.",
+  "permissionDenied": "Permission is needed to continue.",
+  "storage": "Couldn't read saved data on this device.",
+  "unknown": "Something went wrong.",
+  "title": "Something went wrong",
+  "offlineTitle": "You're offline"
+}

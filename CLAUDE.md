@@ -677,7 +677,7 @@ theme/
 ├── tokens/
 │   ├── colors.ts        # raw palette — never used directly by components
 │   ├── spacing.ts       # 4pt scale
-│   ├── typography.ts    # per-script families (Inter / Vazirmatn), sizes, weights
+│   ├── typography.ts    # per-script fonts (system / Vazirmatn), sizes, weights
 │   ├── radii.ts
 │   └── elevation.ts
 ├── semantic/
@@ -704,7 +704,8 @@ A pure function `getWeatherPalette(condition, timeOfDay)` in `theme/weather/` re
 - Access theme through `useTheme()`. Never import a palette file into a component.
 - Both light and dark must be handled. A component that only looks right in one is unfinished.
 - Glassmorphism is a shared `<GlassSurface>` primitive in `shared/ui/`, not repeated blur props.
-- Typography is script-aware: Persian text uses Vazirmatn with its own line-height, because Persian glyphs need more vertical room than Latin at the same point size.
+- Typography is script-aware: Persian uses **Vazirmatn** with ~12% more line height, because Persian glyphs need more vertical room than Latin at the same point size.
+- Latin uses the **system font** (SF Pro / Roboto) — the same choice Apple Weather makes. It participates in Dynamic Type and costs nothing in bundle size. Persian gets a bundled face because Arabic-script coverage in system fonts varies by OS version.
 
 ---
 

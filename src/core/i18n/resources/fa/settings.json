@@ -1,0 +1,21 @@
+{
+  "title": "تنظیمات",
+  "appearance": {
+    "title": "ظاهر",
+    "theme": "پوسته",
+    "light": "روشن",
+    "dark": "تیره",
+    "system": "مطابق دستگاه"
+  },
+  "language": {
+    "title": "زبان",
+    "restartTitle": "راه‌اندازی مجدد لازم است",
+    "restartBody": "تغییر جهت چیدمان برای اعمال درست به راه‌اندازی مجدد نیاز دارد.",
+    "restartConfirm": "الان راه‌اندازی کن",
+    "restartLater": "بعداً"
+  },
+  "attribution": {
+    "title": "منابع داده",
+    "openMeteo": "داده‌های هواشناسی از Open-Meteo (CC BY 4.0)"
+  }
+}

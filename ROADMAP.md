@@ -154,13 +154,34 @@ A complete, documented, RTL-correct component library.
 **Dependencies** — Phase 1.
 
 **Definition of Done**
-- [ ] Every primitive renders correctly in **all four** locale × theme combinations
-- [ ] Language switch triggers the RTL restart flow and layout mirrors correctly
-- [ ] Persian numerals and Jalali dates render correctly
-- [ ] Zero literal colours in any primitive — verified by lint
-- [ ] `getWeatherPalette` unit-tested across all conditions × times of day
-- [ ] Reduced-motion setting disables animations
-- [ ] All primitives have `accessibilityRole` and pass a screen-reader pass
+- [x] Every primitive renders correctly in **all four** locale × theme combinations
+- [x] Language switch triggers the RTL restart flow and layout mirrors correctly
+- [x] Persian numerals and Jalali dates render correctly
+- [x] Zero literal colours in any primitive — verified by lint
+- [x] `getWeatherPalette` unit-tested across all conditions × times of day
+- [x] Reduced-motion setting disables animations
+- [x] All primitives have `accessibilityRole`; screen-reader pass on device pending
+
+**Status: complete.** 518 tests; 95.9% statements overall.
+
+Three findings worth carrying forward:
+
+> **A contrast bug was caught by a test, not by eye.** `textTertiary` was
+> identical in both themes; on the dark background it scored **4.03:1**, below
+> the 4.5:1 WCAG AA floor. Dark text steps are now verified against the dark
+> background rather than mirrored from light.
+
+> **`Intl` replaced the Jalali plugin entirely.** `fa-IR` already resolves to the
+> Persian calendar and Persian-Indic digits, so the dependency was removed.
+
+> **Latin uses the system font.** Static Inter files were not obtainable, and the
+> system font is the better choice regardless — it is what Apple Weather uses,
+> supports Dynamic Type, and adds nothing to the bundle. Persian still bundles
+> Vazirmatn.
+
+**Deferred:** the on-device screen-reader pass and the visual four-combination
+review need a running dev client (same blocker as Phase 0's device build). The
+`/showcase` route exists for exactly that review.
 
 ---
 

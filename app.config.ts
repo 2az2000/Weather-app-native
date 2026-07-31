@@ -34,7 +34,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: 'com.amirali.weather',
   },
 
-  plugins: ['expo-router'],
+  plugins: [
+    'expo-router',
+    'expo-sqlite',
+    'expo-localization',
+    [
+      'expo-font',
+      {
+        // Persian only. Latin uses the SYSTEM font (SF Pro / Roboto) — the same
+        // choice Apple Weather makes, and it participates in Dynamic Type at no
+        // bundle cost. Persian has no equivalent option: Arabic-script coverage
+        // in system fonts varies by OS version and the metrics are not tuned for
+        // Persian at UI sizes (CLAUDE.md §18).
+        fonts: [
+          './assets/fonts/Vazirmatn-Regular.ttf',
+          './assets/fonts/Vazirmatn-Medium.ttf',
+          './assets/fonts/Vazirmatn-SemiBold.ttf',
+          './assets/fonts/Vazirmatn-Bold.ttf',
+        ],
+      },
+    ],
+  ],
 
   experiments: {
     typedRoutes: true,

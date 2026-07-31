@@ -1,0 +1,25 @@
+{
+  "appName": "آب‌وهوا",
+  "actions": {
+    "retry": "تلاش دوباره",
+    "cancel": "انصراف",
+    "confirm": "تأیید",
+    "close": "بستن",
+    "save": "ذخیره",
+    "delete": "حذف",
+    "search": "جست‌وجو",
+    "refresh": "به‌روزرسانی"
+  },
+  "state": {
+    "loading": "در حال بارگذاری",
+    "empty": "هنوز چیزی اینجا نیست",
+    "offline": "آفلاین هستید",
+    "offlineDetail": "نمایش داده‌های ذخیره‌شده از {{time}}",
+    "updatedAt": "به‌روزرسانی {{time}}"
+  },
+  "a11y": {
+    "loadingContent": "محتوا در حال بارگذاری است",
+    "closeSheet": "بستن پنل",
+    "back": "بازگشت"
+  }
+}

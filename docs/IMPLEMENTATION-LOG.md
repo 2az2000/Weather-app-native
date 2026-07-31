@@ -24,11 +24,11 @@
 
 | | |
 |---|---|
-| **Phases complete** | 0 (Foundation), 1 (Core Infrastructure) |
-| **Next phase** | 2 — Design System, Theme, i18n & RTL |
-| **Source files** | 31 (excluding tests) |
-| **Test files** | 20 · 199 tests |
-| **Coverage (`src/core/`)** | 98.6% statements · 91.4% branches |
+| **Phases complete** | 0 (Foundation), 1 (Core Infrastructure), 2 (Design System, Theme, i18n & RTL) |
+| **Next phase** | 3 — Locations |
+| **Source files** | 60 (excluding tests) |
+| **Test files** | 30 · 518 tests |
+| **Coverage** | 95.9% statements overall · `core/` 98.6% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
 ### Commits
@@ -312,6 +312,106 @@ Per CLAUDE.md §36, docs changed in the same commits as the code:
 - **CLAUDE.md §37** — pinned-version table with the failure each pin prevents
 - **`src/core/README.md`** — added `query/`, marked `i18n/` as Phase 2
 - **ROADMAP.md** — Phase 0 and Phase 1 DoD marked with verification evidence
+
+---
+
+## Phase 2 — Design System, Theme, i18n & RTL
+
+**Commit:** `<pending>`
+**Objective:** the visual and linguistic foundation, complete in all four locale x theme combinations *before any product screen exists*.
+
+### Delivered
+
+| Area | Contents |
+|---|---|
+| `theme/tokens/` | Colours (raw palette), 4pt spacing, script-aware typography, radii, per-platform elevation |
+| `theme/semantic/` | Light and dark mappings behind one `SemanticColors` interface, so a token cannot be added to one theme and forgotten in the other |
+| `theme/weather/` | `getWeatherPalette(condition, timeOfDay)` — pure, 10 conditions x 4 time bands |
+| `theme/` | `createTheme`, `ThemeProvider`, `useTheme` — imports nothing, takes its inputs as props |
+| `core/i18n/` | i18next with three namespaces x two locales, `Locale` metadata, RTL helpers, `Intl`-based formatters |
+| `shared/hooks/` | `useDebounce`, `useDebouncedCallback`, `useAppState`, `useOnForeground`, `useReducedMotion`, `useMotionDuration`, `useHaptics` |
+| `shared/ui/` | `Text`, `Card`, `GlassSurface`, `Button`, `IconButton`, `Skeleton`, `SkeletonText`, `Divider`, `PressableScale`, `Sheet` |
+| `features/settings/` | Preferences store (theme mode, locale, units, pending locale) persisted to MMKV with a version and migration |
+| `app/showcase.tsx` | Development-only gallery, redirected away in production |
+
+**518 tests, 95.9% statements overall.** Coverage ratchets added for `theme/` and `shared/`.
+
+### Problems encountered
+
+#### 1. Reanimated 4 needs a separate worklets package
+**Symptom:** peer dependency on `react-native-worklets@0.10.x`, absent after installing Reanimated.
+**Cause:** Reanimated 4 moved its worklet runtime into a standalone package. The Babel plugin moved with it — `react-native-reanimated/plugin` no longer exists.
+**Resolution:** installed `react-native-worklets` and pointed `babel.config.js` at `react-native-worklets/plugin`, still last in the plugin list.
+
+#### 2. Reanimated crashed every component test
+**Symptom:** `TypeError: Cannot read properties of undefined (reading 'loadUnpackers')` on any import of a component using `useSharedValue`.
+**Cause:** the `.native` entry points of `react-native-worklets` require a JSI binding that does not exist in Node.
+**Resolution:** `resolver: 'react-native-worklets/jest/resolver'` in `jest.config.js` — an official resolver that strips the `.native` extension so the plain JS implementation is used.
+
+#### 3. A dark-mode contrast failure, found by a test rather than by eye
+**Symptom:** a test asserting that light and dark differ for every colour token failed, listing `textTertiary` as identical.
+**Investigation:** both themes used `grey400` (`#667085`). Against the dark background (`grey950`) that is **4.03:1** — below the 4.5:1 WCAG AA floor for body text. Against the light background it is fine, which is exactly why it survived being written.
+**Resolution:** dark text steps re-derived against the dark background — `textSecondary` to `grey200`, `textTertiary` to `grey300` (7.78:1).
+**Lesson:** **dark mode is not an inversion of light mode.** A token that is correct in one theme carries no guarantee in the other, and "it looks fine" is not a contrast measurement. The parity test now exempts exactly two tokens (`textOnAccent`, `textOnWeather`) and fails on any other match.
+
+#### 4. `Intl` made the Jalali dependency unnecessary
+**Symptom:** `jalaliday` publishes only `dist/index.mjs`; Jest could not parse it, and extending `transformIgnorePatterns` did not help because the pattern does not cover `.mjs`.
+**Investigation before fighting the config:** does the platform already do this? It does. `Intl.DateTimeFormat('fa-IR')` **resolves to the Persian calendar by default** and returns Persian-Indic digits — `۹ مرداد` for 31 July 2026, correct without a plugin.
+**Resolution:** removed `jalaliday`, rewrote the formatters on `Intl`. `Intl.NumberFormat`, `Intl.RelativeTimeFormat` and `Intl.DateTimeFormat` together cover numbers, dates, weekdays, times and relative time in both locales.
+**Lesson:** a build-tooling problem is sometimes a signal to re-examine the requirement. CLAUDE.md section 36 asks whether a dependency is needed *before* adding one; the question is worth asking again when one starts causing trouble.
+**Residual risk:** this relies on the JS engine having full ICU. Hermes provides it on both platforms, but the Jalali output must be confirmed on a real device — Node and Hermes do not always ship identical ICU data.
+
+#### 5. Static Inter font files were not obtainable
+**Symptom:** three sources returned either a variable font under four static names, or a `.woff2` renamed to `.ttf`. All four files were byte-identical — every weight would have rendered the same.
+**Resolution:** **Latin now uses the system font** (SF Pro / Roboto). This is the better choice regardless: it is what Apple Weather uses, it participates in Dynamic Type, and it removes ~3.5 MB from the bundle. Persian still bundles Vazirmatn, because Arabic-script coverage in system fonts varies by OS version and the metrics are not tuned for Persian at UI sizes.
+**Consequence:** `resolveFont(script, weight)` returns `{ fontFamily, fontWeight }` rather than a family string — Latin carries a numeric weight with no family, Persian a family with no weight. Setting both would double-bold a face that is already bold.
+
+#### 6. Bare path aliases did not resolve
+**Symptom:** `Cannot find module '@/theme'`, while `@/theme/tokens/radii` resolved fine.
+**Cause:** `tsconfig` mapped only `@/theme/*`. Phase 1 code always used subpaths, so the gap went unnoticed until a barrel import appeared.
+**Resolution:** both forms mapped in `tsconfig.json` and `jest.config.js`. Babel's `module-resolver` already matched prefixes, so it needed no change — which is precisely why the failure showed up in the type checker rather than at runtime.
+
+#### 7. `exactOptionalPropertyTypes` again, twice
+i18next's `missingKeyHandler` and Gorhom's `onClose` both reject an explicit `undefined`. Both resolved with a conditional spread, the same pattern used three times in Phase 1.
+
+#### 8. A test caught a null-safety bug in `useOnForeground`
+**Symptom:** `TypeError: previous.match is not a function`.
+**Cause:** the hook called `.match()` on `AppState.currentState`, which is `undefined` in the test environment — and can be `null` on Android at startup. In production this would have crashed the first time the app was backgrounded on such a device.
+**Resolution:** replaced the regex with explicit equality checks. Simpler *and* safe.
+
+#### 9. `react-hooks/purity` rejected `Date.now()` during render
+Caught in the showcase screen. Hoisted to a module constant. The rule is right: a value that changes every render makes output unstable.
+
+### Verification
+
+| DoD item | How it was proven |
+|---|---|
+| Four locale x theme combinations | `THEME_COMBINATIONS` drives `describe.each` over every primitive |
+| RTL restart flow | `needsRestartForLocale` tested in both directions and for the no-change case |
+| Persian numerals and Jalali dates | Asserts the Persian output contains **no** ASCII digits, and that the Jalali day number differs from the Gregorian one |
+| Zero literal colours | Lint (`no-restricted-syntax`), plus every primitive reading `useTheme()` |
+| `getWeatherPalette` | All 40 combinations, plus override, night-tint and contrast rules |
+| Reduced motion | `useMotionDuration` collapses to 0; `Skeleton` holds a static opacity |
+| `accessibilityRole` | Every control queried by role and accessible name, never by `testID` |
+
+### Deliberate scope decisions
+
+- **The showcase is development-only** and redirects away in production. It is a developer tool; shipping it would be needless surface.
+- **`useHaptics` is iOS-only.** Android's haptic support through this API is inconsistent across OEMs and often feels like a dull buzz. No haptic is better than a bad one.
+- **Blur degrades to a solid fill on Android.** `expo-blur` is expensive and inconsistent there; the intent — a legible panel over the weather gradient — survives either way.
+
+### Documentation kept in sync
+
+- **CLAUDE.md section 18** — typography rewritten around the system-font decision
+- **ROADMAP.md** — Phase 2 DoD marked with evidence and the three findings
+
+### Open items
+
+| Item | Blocker |
+|---|---|
+| On-device screen-reader pass | Requires a running dev client |
+| Visual four-combination review | `/showcase` exists for it; needs a device |
+| Jalali output confirmed under Hermes | Node ICU is not Hermes ICU; must be checked on device |
 
 ---
 
