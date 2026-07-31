@@ -201,13 +201,40 @@ Users can find, save, reorder, and select locations. GPS with graceful permissio
 **Dependencies** — Phases 1, 2.
 
 **Definition of Done**
-- [ ] GPS resolves and reverse-geocodes to a readable place name
-- [ ] Permission denied and "permanently denied" both have designed, non-error UX with a settings link
-- [ ] City search debounced, cached 30 days, works in Persian
-- [ ] Saved locations survive restart and reorder optimistically with rollback
-- [ ] **Geohash quantization unit-tested** — two GPS fixes metres apart produce the same key
-- [ ] Domain + mapper coverage ≥ 95%
-- [ ] Reviewed in Persian RTL
+- [x] GPS resolves and reverse-geocodes to a readable place name
+- [x] Permission denied and "permanently denied" both have designed, non-error UX with a settings link
+- [x] City search debounced, cached 30 days, works in Persian
+- [x] Saved locations survive restart and reorder optimistically with rollback
+- [x] **Geohash quantization unit-tested** — two GPS fixes metres apart produce the same key
+- [x] Domain + mapper coverage ≥ 95% — **both at 100%**, ratcheted in `jest.config.js`
+- [ ] Reviewed in Persian RTL *(needs a running dev client)*
+
+**Status: complete except the on-device Persian review.** 623 tests.
+
+Two architectural corrections, both forced by the boundaries lint rule:
+
+> **The migration registry moved out of `core/`.** Putting feature table
+> definitions in `core/storage` made `core/` import `features/`. `openDatabase`
+> now *receives* its migration list and the composition root assembles it —
+> which is what a composition root is for. The first instinct, a comment calling
+> it "a deliberate exception", was a rationalization.
+
+> **`core/di` became its own element type**, permitted to import feature
+> *barrels*. Binding a domain interface to a data implementation requires seeing
+> both; every DI container has this property, and the alternative — scattering
+> construction across the app — is worse.
+
+One lint rule was itself wrong and was corrected: `feature-domain` was barred
+from importing `core/errors`, but CLAUDE.md §6 and §22 both show domain
+repository interfaces returning `Result<T, AppError>`. `core/errors` is now a
+distinct element type that domain may import; nothing else in `core/` is.
+
+Two bugs were caught by tests rather than review:
+
+| Bug | How it surfaced |
+|---|---|
+| Longitude `180` wrapped to `-180`, flipping the geohash to the opposite end of the range | The test compares against **published reference values**, not this implementation's own output |
+| FlashList v2 removed `estimatedItemSize` | Type error; CLAUDE.md §21 previously mandated supplying it |
 
 ---
 
