@@ -1,5 +1,6 @@
 import {
   APP_ERROR_KINDS,
+  asAppError,
   describeError,
   errorMessageKey,
   networkError,
@@ -83,5 +84,50 @@ describe('AppError', () => {
       expect(described).toEqual({ kind: 'unknown' });
       expect(JSON.stringify(described)).not.toContain('35.7');
     });
+  });
+});
+
+describe('asAppError', () => {
+  it('passes a genuine AppError through unchanged', () => {
+    for (const kind of APP_ERROR_KINDS) {
+      const original = SAMPLES[kind];
+      expect(asAppError(original)).toBe(original);
+    }
+  });
+
+  describe('wrapping what is not an AppError', () => {
+    it('wraps a plain Error', () => {
+      const cause = new Error('boom');
+      expect(asAppError(cause)).toEqual({ kind: 'unknown', cause, retryable: false });
+    });
+
+    it.each([null, undefined, 'a string', 42, true])('wraps %p', (value) => {
+      expect(asAppError(value)).toMatchObject({ kind: 'unknown', retryable: false });
+    });
+
+    it('wraps an object with an UNKNOWN kind', () => {
+      // A shape that looks close enough to slip past a cast, which is exactly
+      // why this narrows rather than asserting (CLAUDE.md §12).
+      const impostor = { kind: 'somethingElse', retryable: true };
+      expect(asAppError(impostor)).toMatchObject({ kind: 'unknown' });
+    });
+
+    it('wraps an object with a valid kind but no retryable flag', () => {
+      // `retryable` drives the retry policy, so a partial object must not be
+      // trusted — a missing flag would read as `undefined` and never retry.
+      expect(asAppError({ kind: 'network' })).toMatchObject({ kind: 'unknown' });
+    });
+
+    it('wraps an object whose retryable is not a boolean', () => {
+      expect(asAppError({ kind: 'network', retryable: 'yes' })).toMatchObject({
+        kind: 'unknown',
+      });
+    });
+  });
+
+  it('always returns something errorMessageKey can translate', () => {
+    for (const value of [null, new Error('x'), { kind: 'nope' }, SAMPLES.network]) {
+      expect(errorMessageKey(asAppError(value))).toMatch(/^errors:/);
+    }
   });
 });

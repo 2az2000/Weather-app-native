@@ -58,6 +58,7 @@ export type { WeatherRepository } from './repositories/weather-repository';
 export { AstronomyCalculator, MOON_PHASES } from './services/astronomy-calculator';
 export type {
   MoonPhase,
+  PolarState,
   SunTimes,
   SunPosition,
   MoonInfo,

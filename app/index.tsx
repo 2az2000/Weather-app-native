@@ -1,34 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
-
 /**
- * Phase 0 placeholder.
+ * Home route.
  *
- * Replaced in Phase 5 by `export { HomeScreen as default } from '@/features/weather'`.
- * It exists only so the dev client has something to render and the toolchain
- * can be verified end to end.
+ * A route file wires and re-exports; all UI lives in the feature
+ * (CLAUDE.md §17). Restructuring the router never touches screen code.
  */
-export default function Index() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Weather</Text>
-      <Text style={styles.subtitle}>Phase 0 — foundation ready</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-  },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-});
+export { HomeScreen as default } from '@/features/weather';

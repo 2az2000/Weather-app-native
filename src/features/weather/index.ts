@@ -65,7 +65,14 @@ export {
 
 // ── Domain services and use cases ────────────────────────────────────────────
 export { AstronomyCalculator, MOON_PHASES } from './domain';
-export type { MoonPhase, SunTimes, SunPosition, MoonInfo, TimeOfDay } from './domain';
+export type {
+  MoonPhase,
+  PolarState,
+  SunTimes,
+  SunPosition,
+  MoonInfo,
+  TimeOfDay,
+} from './domain';
 
 export type { WeatherRepository } from './domain';
 export {
@@ -100,3 +107,17 @@ export type {
  * migration list without `core/` importing a feature (ADR-0007).
  */
 export { forecastSnapshotsMigration } from './data/migrations/002-forecast-snapshots';
+
+// ── Presentation ─────────────────────────────────────────────────────────────
+export { HomeScreen } from './presentation/screens/home-screen';
+export { weatherKeys } from './presentation/hooks/query-keys';
+export {
+  useForecast,
+  useHourlyForecast,
+  useDailyForecast,
+  useMinutelyForecast,
+  useSevereAlerts,
+  useRefreshForecast,
+} from './presentation/hooks/use-forecast';
+export { useWeatherAppearance } from './presentation/hooks/use-weather-appearance';
+export type { WeatherAppearance } from './presentation/hooks/use-weather-appearance';

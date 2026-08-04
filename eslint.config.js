@@ -260,6 +260,7 @@ module.exports = defineConfig([
                 'core-di',
                 'core-errors',
                 'shared',
+                'shared-types',
                 'theme',
                 'feature-barrel',
               ],

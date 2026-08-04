@@ -1,0 +1,74 @@
+{
+  "hero": {
+    "feelsLike": "احساس می‌شود {{value}}",
+    "highLow": "بیشینه {{high}}  کمینه {{low}}"
+  },
+  "sections": {
+    "hourly": "پیش‌بینی ساعتی",
+    "daily": "پیش‌بینی {{count}} روزه",
+    "details": "جزئیات",
+    "sunAndMoon": "خورشید و ماه"
+  },
+  "metrics": {
+    "feelsLike": "دمای محسوس",
+    "humidity": "رطوبت",
+    "wind": "باد",
+    "pressure": "فشار",
+    "visibility": "دید افقی",
+    "dewPoint": "نقطهٔ شبنم",
+    "uvIndex": "شاخص فرابنفش",
+    "cloudCover": "پوشش ابر",
+    "precipitation": "بارش"
+  },
+  "uv": {
+    "low": "کم",
+    "moderate": "متوسط",
+    "high": "زیاد",
+    "veryHigh": "خیلی زیاد",
+    "extreme": "بسیار شدید"
+  },
+  "sun": {
+    "sunrise": "طلوع",
+    "sunset": "غروب",
+    "polarDay": "امروز خورشید غروب نمی‌کند",
+    "polarNight": "امروز خورشید طلوع نمی‌کند"
+  },
+  "moon": {
+    "title": "ماه",
+    "illumination": "{{value}} روشن",
+    "new": "ماه نو",
+    "waxingCrescent": "هلال افزاینده",
+    "firstQuarter": "تربیع اول",
+    "waxingGibbous": "کوژ افزاینده",
+    "full": "ماه کامل",
+    "waningGibbous": "کوژ کاهنده",
+    "lastQuarter": "تربیع آخر",
+    "waningCrescent": "هلال کاهنده"
+  },
+  "conditions": {
+    "clear": "صاف",
+    "partlyCloudy": "کمی ابری",
+    "cloudy": "ابری",
+    "fog": "مه",
+    "drizzle": "نم‌نم باران",
+    "rain": "باران",
+    "heavyRain": "باران شدید",
+    "snow": "برف",
+    "sleet": "برف و باران",
+    "thunderstorm": "رعدوبرق"
+  },
+  "now": "اکنون",
+  "today": "امروز",
+  "precipitationSoon": "شروع بارش {{time}}",
+  "noPrecipitation": "در دو ساعت آینده بارشی پیش‌بینی نمی‌شود",
+  "interpolated": "برآورد شده از دادهٔ ساعتی",
+  "a11y": {
+    "currentConditions": "{{condition}}، {{temperature}}، احساس می‌شود {{apparent}}",
+    "hourlyPoint": "{{time}}: {{condition}}، {{temperature}}",
+    "dailyPoint": "{{day}}: {{condition}}، بیشینه {{high}}، کمینه {{low}}",
+    "metric": "{{label}}: {{value}}",
+    "refresh": "به‌روزرسانی پیش‌بینی",
+    "changeLocation": "تغییر مکان",
+    "moonPhase": "{{phase}}، {{illumination}} روشن"
+  }
+}

@@ -152,3 +152,26 @@ export function describeError(error: AppError): Record<string, unknown> {
       return { kind: error.kind };
   }
 }
+
+/**
+ * Narrow an unknown thrown value to an `AppError`.
+ *
+ * Needed at every query boundary: TanStack types `error` as `Error`, but this
+ * app's queries reject with an `AppError`. A cast would silence the compiler
+ * without checking anything (CLAUDE.md §12), so this VERIFIES the shape and
+ * wraps whatever does not match — a genuinely unexpected throw then surfaces as
+ * `unknown` rather than crashing a screen that assumed a `kind` field.
+ */
+export function asAppError(value: unknown): AppError {
+  if (typeof value !== 'object' || value === null) return unknownError(value);
+
+  const candidate = value as { kind?: unknown; retryable?: unknown };
+
+  const hasKnownKind =
+    typeof candidate.kind === 'string' &&
+    (APP_ERROR_KINDS as readonly string[]).includes(candidate.kind);
+
+  return hasKnownKind && typeof candidate.retryable === 'boolean'
+    ? (value as AppError)
+    : unknownError(value);
+}

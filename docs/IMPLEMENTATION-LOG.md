@@ -24,10 +24,10 @@
 
 | | |
 |---|---|
-| **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data) |
-| **Next phase** | 5 — Home Experience (the first screen) |
-| **Source files** | 118 (excluding tests) |
-| **Test files** | 48 · 888 tests |
+| **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data), 5 (Home Experience) |
+| **Next phase** | 6 — Details & Charts |
+| **Source files** | 136 (excluding tests) |
+| **Test files** | 51 · 950 tests |
 | **Coverage** | `core/` 98.6% · weather mappers 100% functions · locations domain 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
@@ -588,6 +588,94 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 | Real provider responses as fixtures | Fixtures are hand-built to the documented schema; capturing live responses needs network access |
 | `local-weather-datasource` coverage | Thin SQLite wrapper; the risky logic (JSON revival, staleness) is covered, the delegation is not |
 | Hermes ICU confirmation for Jalali output | Carried over from Phase 2 — still needs a device |
+
+---
+
+## Phase 5 — Home Experience
+
+**Commit:** `<pending>`
+**Objective:** the first user-visible screen, and proof the architecture delivers a premium experience.
+
+### Delivered
+
+| Area | Contents |
+|---|---|
+| `presentation/hooks/` | `weatherKeys` factory (geohash-quantized), six query hooks, `useWeatherAppearance` deriving the sky from astronomy |
+| `presentation/components/` | Dynamic gradient background, current-conditions hero, RTL-aware hourly strip, daily list with a shared temperature scale, metric grid, sun/moon card, skeleton, data-age banner, error state |
+| `presentation/screens/` | `HomeScreen` — composition only |
+| `locations/` | `useSelectedLocationStore` — which place is showing, persisted to MMKV |
+| `core/i18n/` | `weather` namespace, English and Persian |
+| `core/errors/` | `asAppError` narrowing, needed at every query boundary |
+
+**950 tests.** Every component asserted in all four locale × theme combinations.
+
+### Problems encountered
+
+#### 1. 🔴 ADR-0006's FlashList fix no longer exists
+**Symptom:** `Property 'inverted' does not exist on type FlashListProps`.
+**Cause:** ADR-0006 prescribed setting `inverted` from `isRTL` for a horizontal list. **FlashList v2 removed the prop.**
+**Resolution:** rely on the platform — React Native mirrors a horizontal scroll view natively when `I18nManager.isRTL` is set, so the first item lands on the right and the initial offset is already correct. Inverting on top of that would DOUBLE-flip.
+**What was corrected:** the ADR and CLAUDE.md §19 both carried the dead instruction. Leaving them would have sent a future reader after an API that does not exist, so both were revised and the ADR now records the revision.
+**Still open:** this is the one part a unit test cannot prove. It needs an on-device check in Persian.
+
+#### 2. Polar day/night was being inferred by a component
+**Symptom:** none — caught while writing the sun/moon card, whose own comment admitted it was guessing.
+**Cause:** the card inferred polar day from the ABSENCE of a sunrise time, then tried to distinguish it from polar night using the dawn/dusk pair. That is wrong in the southern hemisphere, where the seasons are reversed.
+**Resolution:** `AstronomyCalculator` now returns an explicit `polarState`, decided from the sun's elevation at solar noon — which always exists.
+**The principle:** whether the sun crosses the horizon is an astronomical fact, so the domain answers it. A component inferring domain facts from missing data is business logic in the wrong layer (CLAUDE.md §15 rule 5).
+
+#### 3. The coverage ratchet caught an untested addition
+**Symptom:** `coverage threshold for branches (90%) not met: 86.57%` on `./src/core/`, with every test passing.
+**Cause:** `asAppError` was added to `core/errors` without tests.
+**Resolution:** tested it, including every shape that must be REJECTED — an object with an unknown `kind`, a valid kind with no `retryable` flag, a non-boolean `retryable`.
+**Why it matters:** this is exactly the regression the ratchet was installed for in Phase 1. It failed the build rather than letting coverage quietly erode.
+
+#### 4. `as AppError` would have silenced a real gap
+**Symptom:** TanStack types `error` as `Error`; the screen needed an `AppError`.
+**The tempting fix:** `forecast.error as AppError`. TypeScript accepts it and nothing checks anything — banned by CLAUDE.md §12.
+**Resolution:** `asAppError` VERIFIES the shape and wraps whatever does not match. A genuinely unexpected throw now surfaces as `unknown` rather than reaching a screen that assumed a `kind` field and crashing on `error.kind`.
+
+#### 5. `getByRole` cannot see a non-accessible container
+**Symptom:** `Unable to find an element with role: list`, on a `View` that visibly had `accessibilityRole="list"`.
+**Cause:** RNTL only matches elements marked `accessible`. Adding that to a list container would be WRONG — it collapses the list into one accessibility element and hides every child from a screen reader.
+**Resolution:** assert on visible content instead (`Now`, `Today`, `Humidity` / `اکنون`, `امروز`, `رطوبت`).
+**Bonus:** this is the better test. A container role is an implementation choice; the label a user hears is the experience (CLAUDE.md §26 rule 3).
+
+#### 6. `shared-types` was granted to only one layer
+**Symptom:** `feature-presentation is not allowed to import shared-types`.
+**Cause:** Phase 4 split `shared/types` into its own element type but added it only to the domain's allow list. Everything else had reached it through the broader `shared` type, which no longer matched.
+**Resolution:** granted `shared-types` everywhere `shared` is already allowed.
+
+### Verification
+
+| DoD item | How it was proven |
+|---|---|
+| All four locale × theme combinations | Every component rendered under all four; assertions in both languages |
+| Airplane mode with a data-age indicator | Banner tested for presence when offline, ABSENCE when online, and for carrying the age |
+| Background transitions on condition change | `useWeatherAppearance` tested across conditions and times of day, including the severe-weather override |
+| Skeleton matches the real layout | Built block-for-block against each component's dimensions |
+| Zero business logic in components | The screen calls hooks and arranges output; the one inference found (polar state) was moved to the domain |
+| Cold start, frame rate, screen reader | **Not verified** — all three need a running dev client |
+
+### Deliberate scope decisions
+
+- **Lottie weather animations deferred.** The scope listed them, but they are decoration on a screen whose structure and correctness are what Phase 5 exists to establish. Adding an asset pipeline for animations that cannot be reviewed on a device would have been motion nobody can see.
+- **The location switcher sheet is not built.** `useSelectedLocationStore` and the Phase 3 location screens already let a user change location; the bottom-sheet shortcut is a convenience that belongs with the polish pass.
+- **The daily list uses `map`, not FlashList.** CLAUDE.md §21 mandates FlashList for DYNAMIC lists; seven fixed rows inside a scroll view is not one, and virtualising it would nest a scroll container for no gain.
+
+### Documentation kept in sync
+
+- **ADR-0006** — FlashList row corrected, with a dated revision note explaining what changed and why the decision itself stands
+- **CLAUDE.md §19** — the same corrected row
+- **ROADMAP.md** — Phase 5 DoD split into what is proven and what needs a device
+
+### Open items
+
+| Item | Blocker |
+|---|---|
+| Cold-start budget, 60 fps, screen-reader pass | A running dev client — carried since Phase 0 |
+| Hourly strip direction in Persian | Same; the platform-mirroring assumption needs confirming |
+| Lottie animations, location-switcher sheet | Deferred to the polish pass |
 
 ---
 

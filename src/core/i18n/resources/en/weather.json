@@ -1,0 +1,74 @@
+{
+  "hero": {
+    "feelsLike": "Feels like {{value}}",
+    "highLow": "H:{{high}}  L:{{low}}"
+  },
+  "sections": {
+    "hourly": "Hourly forecast",
+    "daily": "{{count}}-day forecast",
+    "details": "Details",
+    "sunAndMoon": "Sun & moon"
+  },
+  "metrics": {
+    "feelsLike": "Feels like",
+    "humidity": "Humidity",
+    "wind": "Wind",
+    "pressure": "Pressure",
+    "visibility": "Visibility",
+    "dewPoint": "Dew point",
+    "uvIndex": "UV index",
+    "cloudCover": "Cloud cover",
+    "precipitation": "Precipitation"
+  },
+  "uv": {
+    "low": "Low",
+    "moderate": "Moderate",
+    "high": "High",
+    "veryHigh": "Very high",
+    "extreme": "Extreme"
+  },
+  "sun": {
+    "sunrise": "Sunrise",
+    "sunset": "Sunset",
+    "polarDay": "The sun does not set today",
+    "polarNight": "The sun does not rise today"
+  },
+  "moon": {
+    "title": "Moon",
+    "illumination": "{{value}} lit",
+    "new": "New moon",
+    "waxingCrescent": "Waxing crescent",
+    "firstQuarter": "First quarter",
+    "waxingGibbous": "Waxing gibbous",
+    "full": "Full moon",
+    "waningGibbous": "Waning gibbous",
+    "lastQuarter": "Last quarter",
+    "waningCrescent": "Waning crescent"
+  },
+  "conditions": {
+    "clear": "Clear",
+    "partlyCloudy": "Partly cloudy",
+    "cloudy": "Cloudy",
+    "fog": "Fog",
+    "drizzle": "Drizzle",
+    "rain": "Rain",
+    "heavyRain": "Heavy rain",
+    "snow": "Snow",
+    "sleet": "Sleet",
+    "thunderstorm": "Thunderstorm"
+  },
+  "now": "Now",
+  "today": "Today",
+  "precipitationSoon": "Precipitation starting {{time}}",
+  "noPrecipitation": "No precipitation expected in the next two hours",
+  "interpolated": "Estimated from hourly data",
+  "a11y": {
+    "currentConditions": "{{condition}}, {{temperature}}, feels like {{apparent}}",
+    "hourlyPoint": "{{time}}: {{condition}}, {{temperature}}",
+    "dailyPoint": "{{day}}: {{condition}}, high {{high}}, low {{low}}",
+    "metric": "{{label}}: {{value}}",
+    "refresh": "Refresh the forecast",
+    "changeLocation": "Change location",
+    "moonPhase": "{{phase}}, {{illumination}} illuminated"
+  }
+}

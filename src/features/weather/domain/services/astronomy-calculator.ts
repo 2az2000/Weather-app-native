@@ -37,6 +37,15 @@ export const MOON_PHASES = [
 
 export type MoonPhase = (typeof MOON_PHASES)[number];
 
+/**
+ * Whether the sun crosses the horizon at all on a given day.
+ *
+ * Inside the polar circles it does not, and which of the two states applies is
+ * an ASTRONOMICAL determination — so it is made here rather than guessed at by
+ * a component from the absence of a sunrise time.
+ */
+export type PolarState = 'normal' | 'polarDay' | 'polarNight';
+
 export interface SunTimes {
   readonly sunrise: Date | undefined;
   readonly sunset: Date | undefined;
@@ -44,6 +53,11 @@ export interface SunTimes {
   /** Civil dawn/dusk — the "golden hour" boundaries. */
   readonly dawn: Date | undefined;
   readonly dusk: Date | undefined;
+  /**
+   * `normal` almost everywhere. Inside the polar circles, whether this is the
+   * midnight sun or the polar night.
+   */
+  readonly polarState: PolarState;
 }
 
 export interface SunPosition {
@@ -91,13 +105,40 @@ export class AstronomyCalculator {
   getSunTimes(date: Date, coordinates: Coordinates): SunTimes {
     const times = SunCalc.getTimes(date, coordinates.latitude, coordinates.longitude);
 
+    const sunrise = validDate(times.sunrise);
+    const sunset = validDate(times.sunset);
+
     return {
-      sunrise: validDate(times.sunrise),
-      sunset: validDate(times.sunset),
+      sunrise,
+      sunset,
       solarNoon: times.solarNoon,
       dawn: validDate(times.dawn),
       dusk: validDate(times.dusk),
+      polarState: this.resolvePolarState(sunrise, sunset, times.solarNoon, coordinates),
     };
+  }
+
+  /**
+   * Which polar state applies.
+   *
+   * When neither a sunrise nor a sunset occurs, the sun is either up all day or
+   * down all day. **Solar noon always exists**, so its elevation settles it —
+   * above the horizon means midnight sun, below means polar night.
+   *
+   * Using the calendar month instead would be wrong in the southern hemisphere,
+   * where the seasons are reversed.
+   */
+  private resolvePolarState(
+    sunrise: Date | undefined,
+    sunset: Date | undefined,
+    solarNoon: Date,
+    coordinates: Coordinates,
+  ): PolarState {
+    if (sunrise !== undefined || sunset !== undefined) return 'normal';
+
+    return this.getSunPosition(solarNoon, coordinates).elevation > 0
+      ? 'polarDay'
+      : 'polarNight';
   }
 
   /**

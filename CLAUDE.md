@@ -739,7 +739,7 @@ These do **not** flip automatically and cause the most common RTL bugs in this c
 |---|---|---|
 | **Reanimated gestures** | Swipe direction is not mirrored. A "swipe to next day" gesture goes the wrong way in Persian. | Multiply translation by `isRTL ? -1 : 1` |
 | **Skia charts** | The canvas has no concept of layout direction. Axes and time series render left-to-right regardless of locale. | Explicitly invert the x-axis scale when `isRTL` |
-| **FlashList horizontal** | Initial scroll offset and item order need explicit handling | Set `inverted` / initial offset from `isRTL` |
+| **FlashList horizontal** | ⚠️ **The old fix no longer exists** — FlashList v2 removed the `inverted` prop | Rely on the platform: RN mirrors a horizontal scroll view natively when `I18nManager.isRTL` is set. Inverting on top of that DOUBLE-flips. Per-item spacing still needs `marginEnd` |
 | **Icons with direction** | Arrows, chevrons, wind direction | Mirror directional icons; **never mirror the compass** — north is north |
 | **`I18nManager.forceRTL`** | Requires a full app restart to take effect | Restart flow via `expo-updates.reloadAsync()` after a confirmation dialog |
 

@@ -2,6 +2,10 @@
 
 **Status:** Accepted
 **Date:** 2026-07-29
+**Revised:** 2026-08-04 — the FlashList guidance below changed when v2 removed
+the `inverted` prop. The DECISION is unchanged; only one prescribed technique
+was wrong, and leaving it would have sent a future reader after an API that no
+longer exists.
 
 ## Context
 
@@ -31,7 +35,7 @@ These do **not** mirror automatically. They are the most common RTL bugs in weat
 |---|---|---|
 | **Reanimated gestures** | Swipe direction is not mirrored — "swipe to next day" goes backwards in Persian | Multiply translation by `isRTL ? -1 : 1` |
 | **Skia charts** | The canvas has no layout direction. A time series renders left-to-right regardless of locale, so **time appears to run backwards in Persian** | Explicitly invert the x-axis scale when `isRTL` |
-| **FlashList horizontal** | Initial scroll offset and item order need explicit handling | Set `inverted` / initial offset from `isRTL` |
+| **FlashList horizontal** | ⚠️ **The old fix no longer exists** — FlashList v2 removed the `inverted` prop | Rely on the platform: RN mirrors a horizontal scroll view natively when `I18nManager.isRTL` is set. Inverting on top of that DOUBLE-flips. Per-item spacing still needs `marginEnd` |
 | **Directional icons** | Arrows and chevrons must mirror | Mirror them — but **never mirror the compass**: north is north in every language |
 | **`I18nManager.forceRTL`** | Requires a full app restart to take effect | Confirmation dialog, then `expo-updates.reloadAsync()` |
 

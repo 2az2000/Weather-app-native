@@ -324,14 +324,37 @@ A complete, beautiful, offline-capable home screen.
 **Dependencies** — Phases 2, 3, 4.
 
 **Definition of Done**
-- [ ] **Content visible < 500 ms from cold start**, from cache, before any network resolves
-- [ ] 60 fps scrolling on a mid-range Android device
-- [ ] Full screen usable in airplane mode with a visible data-age indicator
-- [ ] Background transitions smoothly on condition or time-of-day change
-- [ ] Correct in **all four** locale × theme combinations; hourly strip scrolls the right way in Persian
-- [ ] Skeleton matches real layout (no layout shift on load)
-- [ ] Full screen-reader pass in both languages
-- [ ] Zero business logic in components — verified in review
+- [ ] **Content visible < 500 ms from cold start** *(needs a device to measure)*
+- [ ] 60 fps scrolling on a mid-range Android device *(needs a device)*
+- [x] Full screen usable in airplane mode with a visible data-age indicator
+- [x] Background transitions smoothly on condition or time-of-day change
+- [x] Correct in **all four** locale × theme combinations — asserted per component
+- [ ] Hourly strip scrolls the right way in Persian *(needs a device — see note)*
+- [x] Skeleton matches real layout (no layout shift on load)
+- [ ] Full screen-reader pass in both languages *(needs a device)*
+- [x] Zero business logic in components — every decision sits in a use case or the domain
+
+**Status: built and unit-verified; the measured items need a running dev
+client**, the same blocker carried since Phase 0.
+
+Two corrections, both to guidance written before the code existed:
+
+> **ADR-0006's FlashList fix no longer exists.** That ADR prescribed setting
+> `inverted` from `isRTL` for a horizontal list — but **FlashList v2 removed the
+> `inverted` prop**, so the documented workaround does not compile. React
+> Native mirrors a horizontal scroll view natively when `I18nManager.isRTL` is
+> set, and inverting on top of that would double-flip. The ADR and CLAUDE.md §19
+> were corrected rather than left pointing at a dead API.
+
+> **Polar day/night moved into the domain.** The sun/moon card was inferring it
+> from the absence of a sunrise time, which gets the southern hemisphere wrong.
+> `AstronomyCalculator` now returns an explicit `polarState`, decided from the
+> sun's elevation at solar noon — an astronomical determination, so it belongs
+> in the domain rather than in a component.
+
+**The coverage ratchet earned its place:** adding `asAppError` to `core/errors`
+without tests dropped branch coverage below the threshold and failed the build.
+That is exactly the regression it was installed to catch.
 
 ---
 

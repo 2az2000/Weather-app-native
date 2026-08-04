@@ -14,5 +14,6 @@ export {
   unknownError,
   errorMessageKey,
   describeError,
+  asAppError,
 } from './app-error';
 export type { AppError, AppErrorKind, PermissionKind } from './app-error';

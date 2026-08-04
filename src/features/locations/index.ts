@@ -54,3 +54,5 @@ export {
 } from './presentation/hooks/use-locations';
 export { LocationListScreen } from './presentation/screens/location-list-screen';
 export { LocationSearchScreen } from './presentation/screens/location-search-screen';
+
+export { useSelectedLocationStore } from './presentation/stores/selected-location-store';
