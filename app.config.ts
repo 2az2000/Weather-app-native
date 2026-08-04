@@ -39,6 +39,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sqlite',
     'expo-localization',
     [
+      'expo-location',
+      {
+        // Autolinking already puts the permissions in the manifest, so the app
+        // works without this entry. What the plugin adds is the RATIONALE the
+        // system dialog shows. Phase 3 built designed permission-denied and
+        // permanently-denied flows; letting the OS ask with no explanation
+        // undercuts them, because a user who declines a blank prompt never
+        // reaches those screens in an informed state.
+        locationWhenInUsePermission:
+          'Weather uses your location to show the forecast where you are.',
+      },
+    ],
+    [
       'expo-font',
       {
         // Persian only. Latin uses the SYSTEM font (SF Pro / Roboto) — the same
@@ -67,5 +80,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     openWeatherApiKey: process.env.OPENWEATHER_API_KEY ?? '',
     mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN ?? '',
     mapboxDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN ?? '',
+
+    // Set by hand rather than by `eas init`, which cannot write to a DYNAMIC
+    // config — the same limitation `expo install` hit when adding plugins.
+    // If this drifts from the project on expo.dev, builds fail with a
+    // mismatched-project error rather than anything descriptive.
+    eas: {
+      projectId: 'db286aaf-4ed0-4d67-b50e-2620dee7dae4',
+    },
   },
 });
