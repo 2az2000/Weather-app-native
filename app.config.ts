@@ -81,12 +81,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN ?? '',
     mapboxDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN ?? '',
 
-    // Set by hand rather than by `eas init`, which cannot write to a DYNAMIC
-    // config — the same limitation `expo install` hit when adding plugins.
-    // If this drifts from the project on expo.dev, builds fail with a
-    // mismatched-project error rather than anything descriptive.
+    // Written by hand: `eas init` cannot modify a DYNAMIC config and says so —
+    // the same limitation `expo install` hit when adding plugins.
+    //
+    // This must stay in step with the `slug` above. The project auto-created
+    // with the Expo account carried the ACCOUNT name as its slug, and EAS
+    // rejects a mismatch with a message that names neither side clearly, so a
+    // fresh project was created to match `weather`.
     eas: {
-      projectId: 'db286aaf-4ed0-4d67-b50e-2620dee7dae4',
+      projectId: 'b0adf63f-09f9-4fc7-a200-6fb9d22be235',
     },
   },
 });
