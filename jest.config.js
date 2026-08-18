@@ -6,6 +6,28 @@
  * Per-layer thresholds are raised as each layer is built out — see ROADMAP
  * phase Definitions of Done.
  */
+/**
+ * The timezone every test runs in.
+ *
+ * Several domain rules are deliberately expressed in the DEVICE's local time —
+ * `GetDailyForecast` asks for "the user's today", not "today in UTC". That
+ * makes them correct by design and environment-dependent by consequence, so the
+ * environment has to be fixed or the assertions have nothing stable to compare
+ * against.
+ *
+ * Without this, the suite passed on a machine at UTC+03:30 and failed in CI at
+ * UTC — the fixtures had quietly been written around one author's offset. Half
+ * hour zones (Iran, India, Newfoundland) are the sharp edge: zeroing local
+ * minutes moves the underlying instant by thirty minutes, so a cutoff lands on
+ * a different side of a data point.
+ *
+ * An explicit `TZ` is honoured so the choice stays AUDITABLE — running
+ * `TZ=Asia/Kolkata npm test` re-checks that nothing has quietly re-acquired a
+ * dependency on one offset. That audit is what surfaced this in the first
+ * place, and a hard assignment would have made it impossible to repeat.
+ */
+process.env.TZ ??= 'UTC';
+
 module.exports = {
   preset: 'jest-expo',
 

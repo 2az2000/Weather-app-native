@@ -101,12 +101,21 @@ describe('GetHourlyForecast', () => {
   });
 
   it('keeps the CURRENT hour, which has not finished yet', async () => {
-    const halfPastNoon = new Date('2026-07-31T09:00:00Z');
+    // PART WAY THROUGH the hour containing the first point, which is what the
+    // rule is about: 08:30 has already begun but has not elapsed, so it is
+    // still upcoming and must survive the cutoff.
+    //
+    // This used to pass 09:00Z and expect the 08:30 point to survive, which is
+    // only true in a half-hour timezone: `setMinutes(0, 0, 0)` zeroes LOCAL
+    // minutes, so at UTC+03:30 it moved the cutoff back to 08:30Z and the point
+    // scraped in. At UTC the cutoff stayed at 09:00Z and the test failed. The
+    // instant now sits unambiguously inside the hour in any zone.
+    const midHour = new Date('2026-07-31T08:45:00Z');
 
     const result = await new GetHourlyForecast(fakeRepository()).execute(
       COORDINATES,
       24,
-      halfPastNoon,
+      midHour,
     );
 
     expect(result.unwrapOr([])[0]?.time.toISOString()).toBe('2026-07-31T08:30:00.000Z');

@@ -52,9 +52,23 @@ export function hourlyPoint(offsetHours: number): HourlyPoint {
   };
 }
 
+/**
+ * Local midnight of the day containing {@link NOW}.
+ *
+ * DERIVED rather than hardcoded. This was written as the literal instant
+ * `2026-07-30T20:30:00Z` — local midnight in UTC+03:30 — which silently bound
+ * every daily test to one author's timezone. `GetDailyForecast` computes the
+ * day boundary in local time, so a fixture that hardcodes one offset agrees
+ * with it on exactly one machine and disagrees everywhere else.
+ */
+function localMidnightOfToday(): number {
+  const midnight = new Date(NOW);
+  midnight.setHours(0, 0, 0, 0);
+  return midnight.getTime();
+}
+
 export function dailyPoint(offsetDays: number): DailyPoint {
-  // Local midnight in +03:30 for the day containing NOW, then offset.
-  const base = new Date('2026-07-30T20:30:00Z').getTime();
+  const base = localMidnightOfToday();
 
   return {
     date: new Date(base + offsetDays * 24 * HOUR),

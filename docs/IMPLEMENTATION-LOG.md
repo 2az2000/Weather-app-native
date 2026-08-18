@@ -661,6 +661,25 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 
 **The principle:** a query that is `enabled: false` is a THIRD state, not a loading state. `isLoading` answers "is a request in flight", and a disabled query answers it correctly with `false` — the screen has to ask the separate question of whether its precondition is even satisfiable. Any screen whose query depends on an upstream value needs an explicit branch for that value being absent, or its loading state silently becomes a dead end.
 
+#### 8. 🔴 Two tests passed only in one timezone — CI found them, not the suite
+**Symptom:** the first CI run failed on `GetDailyForecast` (`Expected length: 2, Received length: 1`) and `GetHourlyForecast`, while all 965 tests passed locally.
+**Cause:** the domain fixture hardcoded its daily base as `2026-07-30T20:30:00Z` — **local midnight in UTC+03:30** — and its own comment said so. `GetDailyForecast` computes the day boundary with `setHours(0, 0, 0, 0)`, which is LOCAL time, so fixture and use case agreed on exactly one machine. Running at UTC put the first daily point half an hour before the cutoff and it was filtered out.
+
+The hourly failure was the same root cause with a sharper edge. `setMinutes(0, 0, 0)` zeroes LOCAL minutes, so at a **half-hour offset** it moves the underlying instant by thirty minutes. The test passed `09:00Z` and expected the `08:30` point to survive: at UTC+03:30 the cutoff slid back to `08:30Z` and it scraped in, at UTC the cutoff stayed at `09:00Z` and it did not.
+
+**Resolution:** three changes, none of them to the production rule.
+- `jest.config.js` sets `process.env.TZ ??= 'UTC'`. Several domain rules are deliberately expressed in the DEVICE's local time — `GetDailyForecast` means "the user's today", not "today in UTC" — which makes them correct by design and environment-dependent by consequence. The environment has to be fixed or the assertions have nothing stable to compare against. `??=` rather than `=` keeps the choice **auditable**: `TZ=Asia/Kolkata npm test` re-checks that nothing has quietly re-acquired a dependency on one offset.
+- The fixture DERIVES local midnight from `NOW` instead of hardcoding an instant, so it now means what its name says in any zone.
+- The hourly test passes an instant unambiguously *inside* the hour (`08:45Z`), which is what "keeps the current hour" actually claims. The old instant tested the rule only by accident of the author's offset.
+
+**Verified** by running the whole suite under UTC, Asia/Tehran, Asia/Kolkata, America/St_Johns and Pacific/Auckland — three half-hour zones and a date-line zone. 965 pass in all five.
+
+**This was latent since Phase 4** and is unrelated to the change that triggered the run. It could not have been caught locally, because the machine that wrote the fixture is the one machine where it was correct.
+
+**The principle:** a test that reads the clock or the calendar is testing the machine as much as the code. **Pin the timezone, and keep a way to unpin it** — the pin makes CI reproducible, the escape hatch is what proves the pin is not hiding anything.
+
+**Still open:** `GetDailyForecast` uses the DEVICE's timezone, but a `Forecast` carries the LOCATION's (`timezone: 'Asia/Tehran'`). Viewing Tehran's weather from London therefore shows "today" by London's clock. That is a product decision, not a defect in this fix, and is recorded here rather than silently widened into it.
+
 ### Verification
 
 | DoD item | How it was proven |
@@ -710,7 +729,10 @@ The cache-buster test (Phase 1 #8) passed while proving nothing. Any test whose 
 ### 4. Prefer a seam over a mock; use a mock only where no seam exists
 `Result`, `KeyValueStorage`, `MigrationTarget`, `NetworkMonitor`, `Logger`, and `HttpClient`'s adapter are all injectable, and their tests use fakes. Only three things are module-mocked — `react-native-mmkv`, `expo-network`, `expo-sqlite`, and `expo-constants` — every one a native binding or build-time value with no construction-time seam.
 
-### 5. Fix the documentation in the same commit
+### 5. A test that reads the clock is testing the machine too
+Two domain tests passed for two years' worth of commits and failed on their first CI run, because the fixture encoded the author's UTC+03:30 offset. **Pin the timezone so CI is reproducible, and keep a way to unpin it** — the pin makes runs deterministic, and the escape hatch (`TZ=Asia/Kolkata npm test`) is what proves the pin is not hiding a real dependency. The same reasoning as lesson 1: an assumption nobody probes is an assumption nobody has verified.
+
+### 6. Fix the documentation in the same commit
 Every deviation from plan (npm over pnpm, TS 6 over TS 7, Sentry deferred, `core/query/` added) was written into CLAUDE.md or ROADMAP.md in the commit that caused it. A stale architecture doc is worse than none, because it is trusted.
 
 ---
