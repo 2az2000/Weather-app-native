@@ -52,7 +52,34 @@ export {
   useReorderLocations,
   useLocationPermission,
 } from './presentation/hooks/use-locations';
+export type {
+  LocationPermissionStatus,
+  UseLocationPermissionOptions,
+} from './presentation/hooks/use-locations';
+
+/**
+ * Exported so the HOME screen can compose it.
+ *
+ * A component crossing a feature boundary is a deliberate addition to this
+ * surface, not a reflex (CLAUDE.md §7 rule 2). It earns its place because the
+ * home screen is useless without a location, so it must be able to explain a
+ * refusal and offer the way out — and that explanation is a locations concern,
+ * not a weather one. Composing it in a weather screen is exactly the
+ * cross-feature composition §7 rule 5 sanctions.
+ */
+export { PermissionPrompt } from './presentation/components/permission-prompt';
+export type { PermissionPromptProps } from './presentation/components/permission-prompt';
 export { LocationListScreen } from './presentation/screens/location-list-screen';
 export { LocationSearchScreen } from './presentation/screens/location-search-screen';
 
 export { useSelectedLocationStore } from './presentation/stores/selected-location-store';
+
+/**
+ * Whether the location dialog has ever been shown on this device.
+ *
+ * Public because the auto-request behaviour it gates is consumed outside this
+ * feature (the home screen asks on first launch), so its one piece of state has
+ * to be observable and resettable from there too. Grouped with
+ * `useSelectedLocationStore` because both are client state ABOUT locations.
+ */
+export { useLocationPermissionStore } from './presentation/stores/location-permission-store';

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, View } from 'react-native';
@@ -8,13 +9,16 @@ import { asAppError } from '@/core/errors';
 import {
   describePlace,
   useCurrentLocation,
+  useLocationPermission,
   useSavedLocations,
   useSelectedLocationStore,
 } from '@/features/locations';
 import { usePreferencesStore } from '@/features/settings';
 import { useHaptics } from '@/shared/hooks';
+import { IconButton, Text } from '@/shared/ui';
 import { getWeatherPalette, useTheme } from '@/theme';
 
+import { AwaitingLocation } from '../components/awaiting-location';
 import { CurrentConditionsHero } from '../components/current-conditions-hero';
 import { DailyForecastList } from '../components/daily-forecast-list';
 import { DataAgeBanner } from '../components/data-age-banner';
@@ -53,19 +57,56 @@ export function HomeScreen() {
   const theme = useTheme();
   const { t } = useTranslation('weather');
   const haptics = useHaptics();
+  const router = useRouter();
   const { network } = useContainer();
 
   // ── Which place are we showing? ────────────────────────────────────────────
   const selectedId = useSelectedLocationStore((state) => state.selectedId);
   const savedLocations = useSavedLocations();
-  const currentLocation = useCurrentLocation(selectedId === undefined);
 
-  const place = useMemo(() => {
-    if (selectedId === undefined) return currentLocation.data;
-    return savedLocations.data?.find((location) => location.id === selectedId);
-  }, [selectedId, savedLocations.data, currentLocation.data]);
+  const selectedPlace = useMemo(
+    () =>
+      selectedId === undefined
+        ? undefined
+        : savedLocations.data?.find((location) => location.id === selectedId),
+    [selectedId, savedLocations.data],
+  );
 
+  // A selection can outlive the location it points at — removed on another
+  // screen, or dropped when the database was rebuilt. Following the device
+  // instead is self-healing; the alternative is a screen that waits forever for
+  // a place that no longer exists.
+  const followsDevice =
+    selectedId === undefined ||
+    (savedLocations.data !== undefined && selectedPlace === undefined);
+
+  const currentLocation = useCurrentLocation(followsDevice);
+
+  const place = followsDevice ? currentLocation.data : selectedPlace;
   const coordinates = place?.coordinates;
+
+  // ── Location access ────────────────────────────────────────────────────────
+  // Asked automatically, once, on the first launch — this screen is useless
+  // without a position, and a weather app asking on open is what users expect.
+  // Not asked at all when a saved city is being shown: that view needs no GPS,
+  // so prompting for it would be an interruption with no purpose.
+  const permission = useLocationPermission({ autoRequest: followsDevice });
+
+  /**
+   * Why we have no position, if we have none.
+   *
+   * A permission refusal surfaces here too, as `kind: 'permissionDenied'`.
+   * `AwaitingLocation` checks the permission status FIRST and never reaches
+   * this, because a refusal deserves the prompt that can undo it rather than an
+   * error screen offering a retry that would fail identically.
+   */
+  const locationError = followsDevice
+    ? currentLocation.isError
+      ? asAppError(currentLocation.error)
+      : undefined
+    : savedLocations.isError
+      ? asAppError(savedLocations.error)
+      : undefined;
 
   // ── Weather ────────────────────────────────────────────────────────────────
   const forecast = useForecast(coordinates);
@@ -142,6 +183,26 @@ export function HomeScreen() {
       );
     }
 
+    // Checked BEFORE the forecast's own states, because with no coordinates the
+    // forecast query is disabled: it is neither loading nor failed, it simply
+    // never runs. Falling through to a skeleton here is what left the screen
+    // loading forever when location access had not been granted.
+    if (coordinates === undefined) {
+      return (
+        <AwaitingLocation
+          permissionStatus={permission.status}
+          isRequestingPermission={permission.isRequesting}
+          onRequestPermission={() => {
+            void permission.request();
+          }}
+          error={locationError}
+          onRetry={() => {
+            void currentLocation.refetch();
+          }}
+        />
+      );
+    }
+
     if (forecast.isError) {
       return (
         <WeatherErrorState
@@ -153,12 +214,35 @@ export function HomeScreen() {
       );
     }
 
+    // Reached only with coordinates in hand, so the forecast really is in
+    // flight. A skeleton now means something is actually happening.
     return <HomeSkeleton />;
   })();
 
   return (
     <WeatherBackground palette={appearance?.palette ?? FALLBACK_PALETTE}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* Outside the ScrollView so it is reachable in EVERY state — including
+            the one where location was refused. Without a way to reach the city
+            search from here, declining GPS would leave the app with nothing the
+            user could do next. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            paddingHorizontal: theme.spacing.sm,
+          }}
+        >
+          <IconButton
+            accessibilityLabel={t('a11y.changeLocation')}
+            onPress={() => {
+              router.push('/locations');
+            }}
+            variant="glass"
+            icon={<Text tone="onWeather">☰</Text>}
+          />
+        </View>
+
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}

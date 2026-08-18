@@ -27,7 +27,7 @@
 | **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data), 5 (Home Experience) |
 | **Next phase** | 6 — Details & Charts |
 | **Source files** | 136 (excluding tests) |
-| **Test files** | 51 · 950 tests |
+| **Test files** | 54 · 965 tests |
 | **Coverage** | `core/` 98.6% · weather mappers 100% functions · locations domain 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
@@ -607,7 +607,7 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 | `core/i18n/` | `weather` namespace, English and Persian |
 | `core/errors/` | `asAppError` narrowing, needed at every query boundary |
 
-**950 tests.** Every component asserted in all four locale × theme combinations.
+**965 tests.** Every component asserted in all four locale × theme combinations.
 
 ### Problems encountered
 
@@ -645,6 +645,21 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 **Symptom:** `feature-presentation is not allowed to import shared-types`.
 **Cause:** Phase 4 split `shared/types` into its own element type but added it only to the domain's allow list. Everything else had reached it through the broader `shared` type, which no longer matched.
 **Resolution:** granted `shared-types` everywhere `shared` is already allowed.
+
+#### 7. 🔴 The home screen showed a skeleton forever on every fresh install
+**Symptom:** the APK launched, the background painted, and `HomeSkeleton` never resolved. No error, no crash, nothing in the logs. Every unit test was green.
+**Cause:** a four-step chain, each link individually correct:
+
+1. `useCurrentLocation` reaches `DeviceLocationDataSource.getCurrentCoordinates()`, which READS the permission state and never requests it. On a fresh install that is `granted: false`, so it correctly returns `err(permissionDenied)`.
+2. Nothing on the home path ever called `requestPermission()` — the only caller was `LocationListScreen`, which is unreachable from home.
+3. With no coordinates, `useForecast(undefined)` is `enabled: false`. It never runs, so it is neither loading NOR failed: `data` is `undefined` and `isError` is `false`.
+4. `HomeScreen` checked only those two flags and fell through to `return <HomeSkeleton />`.
+
+**Resolution:** three changes, one per defect. `useLocationPermission({ autoRequest })` asks once on first launch, gated by a persisted `hasRequested` flag so a refusal is not re-prompted on every open. A new `AwaitingLocation` component splits "no coordinates" into the three situations it actually covers — refused, failed, still resolving — so a skeleton once again means work is genuinely in flight. A locations button on the home screen gives anyone who declines GPS a way to search a city instead.
+
+**Why it shipped:** `HomeScreen` had **no test**. Every component it renders was asserted in all four locale × theme combinations, but the screen that decides *which* component to show had none, so not one of its branch decisions was verified. Testing the parts and not the composition tests everything except the decision being made.
+
+**The principle:** a query that is `enabled: false` is a THIRD state, not a loading state. `isLoading` answers "is a request in flight", and a disabled query answers it correctly with `false` — the screen has to ask the separate question of whether its precondition is even satisfiable. Any screen whose query depends on an upstream value needs an explicit branch for that value being absent, or its loading state silently becomes a dead end.
 
 ### Verification
 

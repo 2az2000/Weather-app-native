@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import { GC_TIME, STALE_TIME } from '@/core/config';
 import { useContainer } from '@/core/di';
 import type { AppError, Result } from '@/core/errors';
 
 import type { Place, SavedLocation } from '../../domain';
+import { useLocationPermissionStore } from '../stores/location-permission-store';
 
 import { locationKeys } from './query-keys';
 
@@ -207,10 +208,27 @@ export function useReorderLocations() {
  */
 export type LocationPermissionStatus = 'unknown' | 'granted' | 'denied' | 'blocked';
 
-export function useLocationPermission() {
+export interface UseLocationPermissionOptions {
+  /**
+   * Show the OS dialog once, unprompted, if it has never been shown.
+   *
+   * Opt-IN rather than default, so the side effect belongs to the screen that
+   * wants it. The home screen does — it is useless without a location, and a
+   * weather app asking on launch is the behaviour users expect. The locations
+   * list does not: it is reached deliberately, and its own prompt card is the
+   * better invitation there.
+   */
+  readonly autoRequest?: boolean;
+}
+
+export function useLocationPermission({
+  autoRequest = false,
+}: UseLocationPermissionOptions = {}) {
   const { deviceLocation } = useContainer();
   const queryClient = useQueryClient();
-  const [isRequesting, setIsRequesting] = useState(false);
+
+  const hasRequested = useLocationPermissionStore((state) => state.hasRequested);
+  const markRequested = useLocationPermissionStore((state) => state.markRequested);
 
   const query = useQuery({
     queryKey: locationKeys.permission(),
@@ -222,32 +240,65 @@ export function useLocationPermission() {
     staleTime: 0,
   });
 
-  const request = useCallback(async (): Promise<LocationPermissionStatus> => {
-    setIsRequesting(true);
-    try {
-      const state = await deviceLocation.requestPermission();
-      const status: LocationPermissionStatus = state.granted
-        ? 'granted'
-        : state.canAskAgain
-          ? 'denied'
-          : 'blocked';
+  /**
+   * A mutation rather than a hand-rolled `useState` flag.
+   *
+   * Showing the dialog is an imperative action with a pending state and a
+   * result — exactly what every other action in this file uses `useMutation`
+   * for. It also keeps the pending flag out of this component's own state,
+   * which matters because the auto-request below fires from an effect: a
+   * `setState` called synchronously in an effect body causes the cascading
+   * render `react-hooks/set-state-in-effect` exists to prevent.
+   */
+  const mutation = useMutation({
+    mutationFn: async (): Promise<LocationPermissionStatus> => {
+      // Recorded BEFORE awaiting, and here rather than only on the auto path:
+      // any call means the dialog has been shown, so a re-render while it is
+      // open cannot schedule a second one.
+      markRequested();
 
+      const state = await deviceLocation.requestPermission();
+      return state.granted ? 'granted' : state.canAskAgain ? 'denied' : 'blocked';
+    },
+
+    onSuccess: (status) => {
       queryClient.setQueryData(locationKeys.permission(), status);
 
       if (status === 'granted') {
         void queryClient.invalidateQueries({ queryKey: locationKeys.current() });
       }
+    },
+  });
 
-      return status;
-    } finally {
-      setIsRequesting(false);
-    }
-  }, [deviceLocation, queryClient]);
+  const { mutateAsync } = mutation;
+
+  const request = useCallback(
+    async (): Promise<LocationPermissionStatus> => mutateAsync(),
+    [mutateAsync],
+  );
+
+  const status: LocationPermissionStatus = query.data ?? 'unknown';
+
+  useEffect(() => {
+    if (!autoRequest || hasRequested) return;
+
+    // Only `denied`, never `blocked`. When the OS will no longer prompt,
+    // `request` resolves instantly with no dialog — auto-firing it would burn
+    // the flag and leave the user looking at a card offering a button that
+    // cannot do anything, for a permission only Settings can now change.
+    //
+    // `unknown` is excluded too: the status query has not resolved yet, and
+    // asking before knowing the answer risks prompting someone who has already
+    // granted it.
+    if (status !== 'denied') return;
+
+    void request();
+  }, [autoRequest, hasRequested, status, request]);
 
   return {
-    status: query.data ?? 'unknown',
+    status,
     isLoading: query.isLoading,
-    isRequesting,
+    isRequesting: mutation.isPending,
     request,
   };
 }
