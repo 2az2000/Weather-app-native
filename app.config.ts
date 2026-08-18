@@ -74,12 +74,23 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   extra: {
-    // Open-Meteo (primary provider) requires NO key — see ADR-0002.
-    // Only these three services need one, and none guards the primary
-    // weather data path.
-    openWeatherApiKey: process.env.OPENWEATHER_API_KEY ?? '',
-    mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN ?? '',
-    mapboxDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN ?? '',
+    // Open-Meteo (primary provider) requires NO key — see ADR-0002. Only these
+    // three services need one, and none guards the primary weather data path,
+    // so the app must start with all of them absent.
+    //
+    // Spread CONDITIONALLY rather than defaulting to `''`. An empty string is
+    // PRESENT, and `core/config/env.ts` validates presence with `.min(1)` — so
+    // a `?? ''` fallback made every unset key fail validation at startup, even
+    // though `REQUIRED_KEYS` is deliberately empty. Absent must mean absent.
+    ...(process.env.OPENWEATHER_API_KEY
+      ? { openWeatherApiKey: process.env.OPENWEATHER_API_KEY }
+      : {}),
+    ...(process.env.MAPBOX_ACCESS_TOKEN
+      ? { mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN }
+      : {}),
+    ...(process.env.MAPBOX_DOWNLOAD_TOKEN
+      ? { mapboxDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN }
+      : {}),
 
     // Written by hand: `eas init` cannot modify a DYNAMIC config and says so —
     // the same limitation `expo install` hit when adding plugins.

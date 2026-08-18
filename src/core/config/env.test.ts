@@ -54,6 +54,33 @@ describe('loadEnv', () => {
     expect(loadEnv()).toEqual({ openWeatherApiKey: '', mapboxAccessToken: '' });
   });
 
+  describe('absent versus empty — the distinction a fallback default destroys', () => {
+    it('starts when a key is ABSENT, since REQUIRED_KEYS is empty', () => {
+      setExtra({});
+      expect(() => loadEnv()).not.toThrow();
+    });
+
+    it('REJECTS a key that is present but EMPTY', () => {
+      // This is the asymmetry that broke a real build. `app.config.ts` used
+      // `process.env.X ?? ''`, so an unset variable became a PRESENT empty
+      // string. `.partial()` permits absence but not an empty value, so every
+      // unset key failed validation at startup and the app refused to launch
+      // with "Environment configuration is invalid" — for keys that are not
+      // required at all.
+      //
+      // The fix is in app.config.ts: omit the key entirely when unset. This
+      // test pins the behaviour that made the bug possible, so a future
+      // fallback reintroducing it fails here.
+      setExtra({ openWeatherApiKey: '' });
+      expect(() => loadEnv()).toThrow(EnvironmentError);
+    });
+
+    it('accepts a key that is present and non-empty', () => {
+      setExtra({ openWeatherApiKey: 'ow-key' });
+      expect(loadEnv().openWeatherApiKey).toBe('ow-key');
+    });
+  });
+
   describe('when a value is present but malformed', () => {
     it('throws an EnvironmentError naming the offending variable', () => {
       setExtra({ openWeatherApiKey: 12345 });
