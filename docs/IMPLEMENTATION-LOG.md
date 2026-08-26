@@ -27,7 +27,7 @@
 | **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data), 5 (Home Experience) |
 | **Next phase** | 6 — Details & Charts |
 | **Source files** | 136 (excluding tests) |
-| **Test files** | 54 · 965 tests |
+| **Test files** | 55 · 972 tests |
 | **Coverage** | `core/` 98.6% · weather mappers 100% functions · locations domain 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
@@ -607,7 +607,7 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 | `core/i18n/` | `weather` namespace, English and Persian |
 | `core/errors/` | `asAppError` narrowing, needed at every query boundary |
 
-**965 tests.** Every component asserted in all four locale × theme combinations.
+**972 tests.** Every component asserted in all four locale × theme combinations.
 
 ### Problems encountered
 
@@ -679,6 +679,27 @@ The hourly failure was the same root cause with a sharper edge. `setMinutes(0, 0
 **The principle:** a test that reads the clock or the calendar is testing the machine as much as the code. **Pin the timezone, and keep a way to unpin it** — the pin makes CI reproducible, the escape hatch is what proves the pin is not hiding anything.
 
 **Still open:** `GetDailyForecast` uses the DEVICE's timezone, but a `Forecast` carries the LOCATION's (`timezone: 'Asia/Tehran'`). Viewing Tehran's weather from London therefore shows "today" by London's clock. That is a product decision, not a defect in this fix, and is recorded here rather than silently widened into it.
+
+#### 9. 🔴 A white screen that could not be diagnosed, because nothing was allowed to report
+**Symptom:** on device, a loader followed by a blank white screen. No message, no crash dialog, nothing in any log the user could reach.
+**Investigation:** the data path was cleared first, by calling the LIVE Open-Meteo API with the exact parameters `OpenMeteoDataSource` sends, then feeding the real response through the real Zod schema and the real mapper. It validated and mapped cleanly — 34.2 °C, `clear`, 16 daily points, 384 hourly, `Asia/Tehran` — confirming the provider, the DTO, and the mapper were all correct and that no API key was involved (ADR-0002).
+
+That left rendering, and rendering turned out to have **no way to report anything**:
+
+| Gap | Consequence |
+|---|---|
+| **No error boundary anywhere in the app** | Any error thrown while rendering unmounted the entire tree. React's default is to render nothing, so every render failure looked *identical* — a white screen with no message and no stack |
+| **`RootLayout` returned `null` while the container resolved, with no timeout** | `createContainer` awaits native modules. A REJECTION was handled; a HANG was not, and a promise that never settles produces no error and no state change. The layout renders `null` forever, which is the same white screen |
+| **`openDatabase` let two `await`s escape** | `PRAGMA journal_mode` and `PRAGMA foreign_keys` were bare awaits in a function whose contract is to return a `Result`. A throwing pragma became a rejected promise, turning a survivable storage problem into a fatal startup error — the exact opposite of the MMKV-only degradation CLAUDE.md §24 designs for |
+
+**Resolution:**
+- `shared/ui/error-boundary.tsx` — the boundary CLAUDE.md §22 rule 5 has always required and the app never had. Its fallback is built from raw `react-native` primitives with literal styles and uses **no theme, no translation, and nothing from `shared/`**: those are the very things that might have thrown, and a fallback depending on them turns one failure into two, with the second having nowhere left to render. It shows the message, the component stack and the stack ON SCREEN, because whoever hits this is holding a phone with no debugger attached.
+- A startup timeout in `app/_layout.tsx` converts silence into a diagnosis. It does not cancel startup — a container arriving late still works — it only guarantees the app eventually says something.
+- `openDatabase` wraps its configuration step and closes quietly on the error path, so a close failure cannot replace a precise diagnosis with a vague one.
+
+**What this did NOT do:** identify which of the three actually fired. That is the point — remotely, they were indistinguishable, and no amount of reading could separate them. The next build names its own failure instead.
+
+**The principle:** an app that cannot describe its own failure cannot be debugged remotely, and **the fallback path is the one path that is never exercised until it is the only one left**. It has to be the most conservative code in the project, not the least.
 
 ### Verification
 

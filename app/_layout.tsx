@@ -14,7 +14,17 @@ import {
   PERSIST_MAX_AGE_MS,
 } from '@/core/query';
 import { usePreferencesStore } from '@/features/settings';
+import { ErrorBoundary } from '@/shared/ui';
 import { ThemeProvider, type ColorScheme } from '@/theme';
+
+/**
+ * How long startup may take before the app explains itself.
+ *
+ * Generous on purpose: a cold start on a mid-range device opening SQLite and
+ * running migrations is legitimately slow. This is not a performance budget —
+ * it is the point past which silence has stopped being informative.
+ */
+const STARTUP_TIMEOUT_MS = 10_000;
 
 /**
  * Root layout — the app's composition point.
@@ -35,21 +45,48 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
 
+    // A HANG is not a rejection, and nothing here could previously tell the two
+    // apart. `createContainer` awaits native modules — SQLite, MMKV — and if one
+    // never settles, the promise never resolves and never rejects: no error is
+    // thrown, no state changes, and this component renders `null` forever. That
+    // is indistinguishable from a crash, because both are a white screen.
+    //
+    // The timer converts silence into a diagnosis. It does not cancel startup —
+    // a container arriving late still works — it only guarantees that the app
+    // eventually says something.
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        setStartupError(
+          new Error(
+            `Startup did not finish within ${String(STARTUP_TIMEOUT_MS / 1000)}s. ` +
+              'A native module is most likely not responding — SQLite or MMKV. ' +
+              'The app is installed correctly but one of its native dependencies ' +
+              'never answered.',
+          ),
+        );
+      }
+    }, STARTUP_TIMEOUT_MS);
+
     createContainer()
       .then((created) => {
-        if (!cancelled) setContainer(created);
+        if (!cancelled) {
+          clearTimeout(timeout);
+          setContainer(created);
+        }
       })
       .catch((cause: unknown) => {
         // A container failure means misconfiguration (e.g. a missing required
         // env var). It must surface immediately and legibly rather than as a
         // confusing failure several screens in (ROADMAP Phase 1 DoD).
         if (!cancelled) {
+          clearTimeout(timeout);
           setStartupError(cause instanceof Error ? cause : new Error(String(cause)));
         }
       });
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, []);
 
@@ -85,7 +122,8 @@ export default function RootLayout() {
 
   // Rendering nothing for one frame is correct: the native splash is still up,
   // and MMKV hydration is synchronous once the container exists, so there is no
-  // spinner to show.
+  // spinner to show. The timer above is what keeps "one frame" from silently
+  // becoming forever.
   if (container === undefined || persistOptions === undefined) {
     return null;
   }
@@ -103,7 +141,22 @@ export default function RootLayout() {
               client={queryClient}
               persistOptions={persistOptions}
             >
-              <Stack screenOptions={{ headerShown: false }} />
+              {/* CLAUDE.md §22 rule 5. Without this, ANY error thrown while
+                  rendering unmounts the whole tree and leaves a white screen
+                  carrying no message and no stack — which is exactly how this
+                  app failed on device, with every possible cause looking
+                  identical from the outside. */}
+              <ErrorBoundary
+                label="The app"
+                onError={(error, componentStack) => {
+                  container.logger.error('app.render.crashed', {
+                    message: error.message,
+                    componentStack: componentStack.trim().split('\n').slice(0, 8),
+                  });
+                }}
+              >
+                <Stack screenOptions={{ headerShown: false }} />
+              </ErrorBoundary>
             </PersistQueryClientProvider>
           </ThemeProvider>
         </I18nextProvider>

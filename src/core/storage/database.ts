@@ -111,16 +111,53 @@ export async function openDatabase(
   // writer, which matters because the widget reads while the app may be
   // refreshing. Foreign keys are off by default in SQLite and must be enabled
   // per connection.
-  await db.execAsync('PRAGMA journal_mode = WAL');
-  await db.execAsync('PRAGMA foreign_keys = ON');
+  //
+  // Wrapped, because these were previously bare `await`s. This function's
+  // contract is to return a `Result` — the app is designed to start WITHOUT a
+  // database and degrade to MMKV only (CLAUDE.md §24) — but a throwing PRAGMA
+  // escaped as a rejected promise, so a storage hiccup became a fatal startup
+  // error instead of the graceful degradation the type signature promises.
+  const configured = await fromPromise(
+    (async () => {
+      await db.execAsync('PRAGMA journal_mode = WAL');
+      await db.execAsync('PRAGMA foreign_keys = ON');
+    })(),
+    (cause) => {
+      logger.error('storage.database.configureFailed', { cause });
+      return storageError('configure database');
+    },
+  );
+
+  if (configured.isErr()) {
+    await closeQuietly(db, logger);
+    return err(configured.error);
+  }
 
   const migrated = await runMigrations(toMigrationTarget(db), migrations, logger);
   if (migrated.isErr()) {
-    await db.closeAsync();
+    await closeQuietly(db, logger);
     return err(migrated.error);
   }
 
   return ok(wrap(db));
+}
+
+/**
+ * Close without letting the close itself become the reported failure.
+ *
+ * This runs on a path that is ALREADY returning an error. A throwing
+ * `closeAsync` here would replace a precise diagnosis ("migration 3 failed")
+ * with a vague one about closing a handle nobody can use anyway.
+ */
+async function closeQuietly(db: SQLite.SQLiteDatabase, logger: Logger): Promise<void> {
+  const closed = await fromPromise(db.closeAsync(), (cause) => {
+    logger.warn('storage.database.closeFailed', { cause });
+    return storageError('close database');
+  });
+
+  // The result is deliberately discarded: the caller already has the error
+  // that matters.
+  void closed;
 }
 
 function wrap(db: SQLite.SQLiteDatabase): Database {

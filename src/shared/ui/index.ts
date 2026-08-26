@@ -27,3 +27,5 @@ export type { SheetProps } from './sheet';
 
 // Development-only gallery. Not part of the design system's public surface —
 // imported directly by `app/showcase.tsx`, which redirects away in production.
+export { ErrorBoundary } from './error-boundary';
+export type { ErrorBoundaryProps } from './error-boundary';
