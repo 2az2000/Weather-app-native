@@ -111,6 +111,66 @@ describe('query cache persistence', () => {
     expect(after.getQueryData(queryKey)).toEqual(cached);
   });
 
+  it('restores a Date field as a REAL Date, not the string JSON.parse would leave it', async () => {
+    // Found on a real device: DataAgeBanner calling `.getTime()` on a
+    // rehydrated `fetchedAt` threw `TypeError: undefined is not a function`,
+    // because the default persister deserializer is a plain `JSON.parse` with
+    // no reviver — every `Date` survives the write as an ISO string and comes
+    // back as a plain string, never a `Date` again. This pins the fix: it
+    // must come back a `Date`, and every `Date` method must actually work.
+    const storage = createInMemoryKeyValueStorage();
+    const persister = createQueryPersister(storage, 0);
+    const fetchedAt = new Date('2026-07-31T08:30:00.000Z');
+
+    const before = createQueryClient();
+    before.setQueryData(queryKey, { fetchedAt });
+    await persistQueryClientSave({
+      queryClient: before,
+      persister,
+      buster: PERSIST_BUSTER,
+    });
+    await flushWrites();
+
+    const after = createQueryClient();
+    await persistQueryClientRestore({
+      queryClient: after,
+      persister,
+      maxAge: PERSIST_MAX_AGE_MS,
+      buster: PERSIST_BUSTER,
+    });
+
+    const restored = after.getQueryData<{ fetchedAt: Date }>(queryKey);
+    expect(restored?.fetchedAt).toBeInstanceOf(Date);
+    expect(restored?.fetchedAt.getTime()).toBe(fetchedAt.getTime());
+  });
+
+  it('leaves an ordinary string alone — only ISO instants are revived', async () => {
+    // A locale tag, a provider name, a condition code: none of these should
+    // be rewritten into a `Date` just because they happen to be strings.
+    const storage = createInMemoryKeyValueStorage();
+    const persister = createQueryPersister(storage, 0);
+    const payload = { locale: 'fa-IR', day: '2026-07-31', provider: 'open-meteo' };
+
+    const before = createQueryClient();
+    before.setQueryData(queryKey, payload);
+    await persistQueryClientSave({
+      queryClient: before,
+      persister,
+      buster: PERSIST_BUSTER,
+    });
+    await flushWrites();
+
+    const after = createQueryClient();
+    await persistQueryClientRestore({
+      queryClient: after,
+      persister,
+      maxAge: PERSIST_MAX_AGE_MS,
+      buster: PERSIST_BUSTER,
+    });
+
+    expect(after.getQueryData(queryKey)).toEqual(payload);
+  });
+
   it('discards persisted data when the cache version changes', async () => {
     const storage = createInMemoryKeyValueStorage();
     const persister = createQueryPersister(storage, 0);

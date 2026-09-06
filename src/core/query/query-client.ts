@@ -18,6 +18,33 @@ import type { KeyValueStorage } from '@/core/storage';
 const PERSIST_KEY = 'weather.query-cache';
 
 /**
+ * Matches an ISO-8601 instant with a mandatory time component — the exact
+ * shape `Date#toJSON` (and therefore `JSON.stringify`) always produces, e.g.
+ * `2026-07-31T08:30:00.000Z`. Deliberately NOT matching a bare date
+ * (`2026-07-31`) or anything without a `T` and a `Z`/offset: those are
+ * ordinary strings this app also persists (locale tags, provider names,
+ * condition codes) and must not be rewritten into `Date` instances.
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Revive ISO instant strings back into `Date` objects on the way out of MMKV.
+ *
+ * `JSON.stringify` turns every `Date` in the cache — `Forecast.fetchedAt`,
+ * `HourlyPoint.time`, `DailyPoint.sunrise`/`sunset`, `SavedLocation.savedAt`,
+ * and more — into a plain string, and plain `JSON.parse` has no way to turn it
+ * back. Found on a real device: a cache written on one launch and restored on
+ * the next left every one of those fields a STRING, so the first component
+ * to call a `Date` method on one — `DataAgeBanner`'s `date.getTime()` — threw
+ * `TypeError: undefined is not a function`. No amount of hardening
+ * `formatRelativeTime` itself could have caught this: the value reaching it
+ * was never a `Date` in the first place.
+ */
+function reviveDates(_key: string, value: unknown): unknown {
+  return typeof value === 'string' && ISO_INSTANT.test(value) ? new Date(value) : value;
+}
+
+/**
  * Retry policy, driven by `AppError.retryable`.
  *
  * Reading the flag rather than inspecting the error shape means adding a new
@@ -75,6 +102,11 @@ export function createQueryPersister(
       setItem: (key, value) => storage.set(key, value),
       removeItem: (key) => storage.delete(key),
     },
+    // The default deserializer is a plain `JSON.parse` with no reviver, which
+    // is what let every persisted `Date` come back as a string. `serialize`
+    // is left at its default (plain `JSON.stringify`) — only the READ side
+    // needed to change.
+    deserialize: (cachedString) => JSON.parse(cachedString, reviveDates),
   });
 }
 
