@@ -42,14 +42,23 @@ import { LOCALE_META, type Locale } from './locales';
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'] as const;
 
 /**
- * Whether this runtime's `Intl` actually implements the given constructor.
+ * Run an `Intl`-backed formatter, falling back to `onDegraded` if it throws.
  *
- * `typeof Intl.X === 'function'` rather than `'X' in Intl`: some partial-ICU
- * engines define the property as `undefined` rather than omitting it, which
- * `in` would not catch.
+ * A `typeof Intl.X === 'function'` pre-check was tried first and was not
+ * enough: on a real device, `Intl.RelativeTimeFormat` existed as a
+ * constructor, but calling `.format()` on the instance threw `TypeError:
+ * undefined is not a function` — a different partial-ICU failure shape from
+ * the missing-constructor one this file's fallbacks were originally built
+ * for. Wrapping the actual call, not just checking the constructor exists,
+ * degrades correctly regardless of which piece of a given Hermes build's ICU
+ * is incomplete.
  */
-function hasIntl(name: 'DateTimeFormat' | 'RelativeTimeFormat'): boolean {
-  return typeof Intl[name] === 'function';
+function withIntl<T>(run: () => T, onDegraded: () => T): T {
+  try {
+    return run();
+  } catch {
+    return onDegraded();
+  }
 }
 
 const PAD2 = (n: number): string => String(n).padStart(2, '0');
@@ -200,45 +209,50 @@ export function formatDate(
   locale: Locale,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' },
 ): string {
-  if (hasIntl('DateTimeFormat')) {
-    return new Intl.DateTimeFormat(tagOf(locale), options).format(date);
-  }
-
-  // Gregorian, not Jalali — a documented degradation (see the file-level note).
-  const rendered = `${date.getDate()} ${MONTH_NAMES[locale][date.getMonth()] ?? ''}`;
-  return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
+  return withIntl(
+    () => new Intl.DateTimeFormat(tagOf(locale), options).format(date),
+    () => {
+      // Gregorian, not Jalali — a documented degradation (see the file-level note).
+      const rendered = `${date.getDate()} ${MONTH_NAMES[locale][date.getMonth()] ?? ''}`;
+      return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
+    },
+  );
 }
 
 /** Format a time of day. Persian uses a 24-hour clock. */
 export function formatTime(date: Date, locale: Locale): string {
-  if (hasIntl('DateTimeFormat')) {
-    return new Intl.DateTimeFormat(tagOf(locale), {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: !LOCALE_META[locale].usesPersianDigits,
-    }).format(date);
-  }
+  return withIntl(
+    () =>
+      new Intl.DateTimeFormat(tagOf(locale), {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: !LOCALE_META[locale].usesPersianDigits,
+      }).format(date),
+    () => {
+      const hour24 = date.getHours();
+      const minute = PAD2(date.getMinutes());
 
-  const hour24 = date.getHours();
-  const minute = PAD2(date.getMinutes());
+      const rendered = LOCALE_META[locale].usesPersianDigits
+        ? `${PAD2(hour24)}:${minute}`
+        : `${((hour24 + 11) % 12) + 1}:${minute} ${hour24 < 12 ? 'AM' : 'PM'}`;
 
-  const rendered = LOCALE_META[locale].usesPersianDigits
-    ? `${PAD2(hour24)}:${minute}`
-    : `${((hour24 + 11) % 12) + 1}:${minute} ${hour24 < 12 ? 'AM' : 'PM'}`;
-
-  return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
+      return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
+    },
+  );
 }
 
 /** Weekday name — used by the daily forecast list. */
 export function formatWeekday(date: Date, locale: Locale, short = true): string {
-  if (hasIntl('DateTimeFormat')) {
-    return new Intl.DateTimeFormat(tagOf(locale), {
-      weekday: short ? 'short' : 'long',
-    }).format(date);
-  }
-
-  const names = WEEKDAY_NAMES[locale];
-  return (short ? names.short : names.long)[date.getDay()] ?? '';
+  return withIntl(
+    () =>
+      new Intl.DateTimeFormat(tagOf(locale), {
+        weekday: short ? 'short' : 'long',
+      }).format(date),
+    () => {
+      const names = WEEKDAY_NAMES[locale];
+      return (short ? names.short : names.long)[date.getDay()] ?? '';
+    },
+  );
 }
 
 /**
@@ -268,29 +282,28 @@ export function formatRelativeTime(
           ? [Math.round(diffSeconds / 3600), 'hour']
           : [Math.round(diffSeconds / 86_400), 'day'];
 
-  if (hasIntl('RelativeTimeFormat')) {
-    return new Intl.RelativeTimeFormat(tagOf(locale), { numeric: 'auto' }).format(
-      value,
-      unit,
-    );
-  }
+  return withIntl(
+    () =>
+      new Intl.RelativeTimeFormat(tagOf(locale), { numeric: 'auto' }).format(value, unit),
+    () => {
+      // `numeric: 'auto'` would say "yesterday"/"now" for certain values; the
+      // fallback always says "N units ago/from now", which is correct if plainer.
+      const magnitude = Math.abs(value);
+      const names = RELATIVE_UNIT_NAMES[locale][unit];
+      const unitName = magnitude === 1 ? names.singular : names.plural;
+      const count = LOCALE_META[locale].usesPersianDigits
+        ? toPersianDigits(String(magnitude))
+        : String(magnitude);
 
-  // `numeric: 'auto'` would say "yesterday"/"now" for certain values; the
-  // fallback always says "N units ago/from now", which is correct if plainer.
-  const magnitude = Math.abs(value);
-  const names = RELATIVE_UNIT_NAMES[locale][unit];
-  const unitName = magnitude === 1 ? names.singular : names.plural;
-  const count = LOCALE_META[locale].usesPersianDigits
-    ? toPersianDigits(String(magnitude))
-    : String(magnitude);
+      if (magnitude === 0) return locale === 'fa' ? 'اکنون' : 'now';
 
-  if (magnitude === 0) return locale === 'fa' ? 'اکنون' : 'now';
-
-  return locale === 'fa'
-    ? value < 0
-      ? `${count} ${unitName} پیش`
-      : `${count} ${unitName} دیگر`
-    : value < 0
-      ? `${count} ${unitName} ago`
-      : `in ${count} ${unitName}`;
+      return locale === 'fa'
+        ? value < 0
+          ? `${count} ${unitName} پیش`
+          : `${count} ${unitName} دیگر`
+        : value < 0
+          ? `${count} ${unitName} ago`
+          : `in ${count} ${unitName}`;
+    },
+  );
 }

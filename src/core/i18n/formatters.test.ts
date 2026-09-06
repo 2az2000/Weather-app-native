@@ -236,6 +236,51 @@ describe('formatters', () => {
       expect(fa).toMatch(/[۰-۹]/);
       expect(fa).not.toMatch(/[0-9]/);
     });
+  });
+
+  /**
+   * A SECOND, different partial-ICU shape — also found on a real device, on
+   * the actual release build, after the fix above shipped. There,
+   * `Intl.RelativeTimeFormat` exists as a constructor (so the guard above
+   * would have let it through), but calling `.format()` on the instance threw
+   * `TypeError: undefined is not a function`. Checking that a constructor
+   * exists says nothing about whether using it works — only wrapping the real
+   * call catches both failure shapes, which is what these tests pin.
+   */
+  describe('when Intl exists but a method on it is broken (the release-build shape)', () => {
+    let realRelativeTimeFormat: typeof Intl.RelativeTimeFormat;
+
+    beforeEach(() => {
+      realRelativeTimeFormat = Intl.RelativeTimeFormat;
+
+      class BrokenRelativeTimeFormat {
+        format(): never {
+          throw new TypeError('undefined is not a function');
+        }
+      }
+
+      Object.defineProperty(Intl, 'RelativeTimeFormat', {
+        value: BrokenRelativeTimeFormat,
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(Intl, 'RelativeTimeFormat', {
+        value: realRelativeTimeFormat,
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it('formatRelativeTime still degrades instead of crashing the screen', () => {
+      const now = new Date('2026-07-31T12:00:00Z');
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60_000);
+
+      expect(() => formatRelativeTime(tenMinutesAgo, 'en', now)).not.toThrow();
+      expect(formatRelativeTime(tenMinutesAgo, 'en', now)).toBe('10 minutes ago');
+    });
 
     it('still pluralises English correctly at the singular boundary', () => {
       const now = new Date('2026-07-31T12:00:00Z');
