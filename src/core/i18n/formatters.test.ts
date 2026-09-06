@@ -144,4 +144,104 @@ describe('formatters', () => {
       expect(formatRelativeTime(now, 'en', now)).toBeTruthy();
     });
   });
+
+  /**
+   * Discovered on a real Android device, not in this suite: a locally built
+   * debug APK's Hermes had `Intl.NumberFormat` but not `Intl.DateTimeFormat` or
+   * `Intl.RelativeTimeFormat` — calling either threw `TypeError: undefined
+   * cannot be used as a constructor` and crashed every screen showing a date.
+   *
+   * Jest runs on Node, which always has full ICU, so no test caught this until
+   * it hit an actual device. These tests delete the constructor to reproduce
+   * that exact environment in a way Jest CAN catch, so a regression here fails
+   * in CI instead of on someone's phone.
+   */
+  describe('when Intl has only partial ICU (a real Hermes build observed on device)', () => {
+    // `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` are read-only on the
+    // `Intl` type, so a plain assignment does not type-check even under a
+    // `@ts-expect-error` (the property write itself is what TS rejects, not an
+    // unrelated type mismatch). `Object.defineProperty` reassigns the same
+    // runtime slot without going through that check, and restoring it in
+    // `afterEach` keeps the deletion scoped to this describe block.
+    let realDateTimeFormat: typeof Intl.DateTimeFormat;
+    let realRelativeTimeFormat: typeof Intl.RelativeTimeFormat;
+
+    function setIntlConstructor(
+      name: 'DateTimeFormat' | 'RelativeTimeFormat',
+      value: unknown,
+    ): void {
+      Object.defineProperty(Intl, name, {
+        value,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    beforeEach(() => {
+      realDateTimeFormat = Intl.DateTimeFormat;
+      realRelativeTimeFormat = Intl.RelativeTimeFormat;
+      setIntlConstructor('DateTimeFormat', undefined);
+      setIntlConstructor('RelativeTimeFormat', undefined);
+    });
+
+    afterEach(() => {
+      setIntlConstructor('DateTimeFormat', realDateTimeFormat);
+      setIntlConstructor('RelativeTimeFormat', realRelativeTimeFormat);
+    });
+
+    it('formatDate degrades to Gregorian instead of throwing', () => {
+      const date = new Date('2026-07-31T12:00:00Z');
+
+      expect(() => formatDate(date, 'en')).not.toThrow();
+      expect(formatDate(date, 'en')).toBe('31 July');
+
+      // Degraded, not equivalent: Persian gets Gregorian too, in Persian
+      // digits — a wrong-but-legible date rather than a crashed screen.
+      expect(() => formatDate(date, 'fa')).not.toThrow();
+      expect(formatDate(date, 'fa')).toMatch(/[۰-۹]/);
+    });
+
+    it('formatTime degrades to manual HH:MM instead of throwing', () => {
+      const date = new Date('2026-07-31T14:30:00');
+
+      expect(() => formatTime(date, 'en')).not.toThrow();
+      expect(formatTime(date, 'en')).toMatch(/2:30\s*PM/);
+
+      expect(() => formatTime(date, 'fa')).not.toThrow();
+      expect(formatTime(date, 'fa')).toMatch(/[۰-۹]/);
+      expect(formatTime(date, 'fa')).not.toMatch(/PM|AM/);
+    });
+
+    it('formatWeekday degrades to a lookup table instead of throwing', () => {
+      // 31 July 2026 is a Friday.
+      const friday = new Date('2026-07-31T12:00:00');
+
+      expect(() => formatWeekday(friday, 'en')).not.toThrow();
+      expect(formatWeekday(friday, 'en')).toBe('Fri');
+      expect(formatWeekday(friday, 'en', false)).toBe('Friday');
+
+      expect(() => formatWeekday(friday, 'fa')).not.toThrow();
+      expect(formatWeekday(friday, 'fa')).toBe('جمعه');
+    });
+
+    it('formatRelativeTime degrades to a manual phrase instead of throwing', () => {
+      const now = new Date('2026-07-31T12:00:00Z');
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60_000);
+
+      expect(() => formatRelativeTime(tenMinutesAgo, 'en', now)).not.toThrow();
+      expect(formatRelativeTime(tenMinutesAgo, 'en', now)).toBe('10 minutes ago');
+
+      expect(() => formatRelativeTime(tenMinutesAgo, 'fa', now)).not.toThrow();
+      const fa = formatRelativeTime(tenMinutesAgo, 'fa', now);
+      expect(fa).toMatch(/[۰-۹]/);
+      expect(fa).not.toMatch(/[0-9]/);
+    });
+
+    it('still pluralises English correctly at the singular boundary', () => {
+      const now = new Date('2026-07-31T12:00:00Z');
+      const oneMinuteAgo = new Date(now.getTime() - 60_000);
+
+      expect(formatRelativeTime(oneMinuteAgo, 'en', now)).toBe('1 minute ago');
+    });
+  });
 });

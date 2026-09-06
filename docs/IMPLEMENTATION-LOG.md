@@ -27,7 +27,7 @@
 | **Phases complete** | 0 (Foundation), 1 (Core), 2 (Design System & RTL), 3 (Locations), 4 (Weather Domain & Data), 5 (Home Experience) |
 | **Next phase** | 6 — Details & Charts |
 | **Source files** | 136 (excluding tests) |
-| **Test files** | 55 · 972 tests |
+| **Test files** | 56 · 979 tests |
 | **Coverage** | `core/` 98.6% · weather mappers 100% functions · locations domain 100% |
 | **CI gates** | typecheck · lint · format · test — all green locally |
 
@@ -150,6 +150,13 @@ Four versions are **deliberately held back**. Each was discovered empirically by
 **Symptom:** commitlint rejected a correctly-formed message with `type may not be empty`.
 **Cause:** `@'...'@` is PowerShell syntax; in Bash it produced a leading empty line, so commitlint read an empty header.
 **Resolution:** used `git commit -F <file>` with a heredoc.
+
+#### 11. 🔴 `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` were `undefined` on a real device's Hermes
+**Symptom:** the moment real forecast data finally reached the screen — right after entries 9 and 10 above were both fixed — the app crashed again, caught by the new `ErrorBoundary`: `TypeError: undefined cannot be used as a constructor`, first from `formatWeekday`, then separately from `DataAgeBanner`'s `formatRelativeTime`.
+**Diagnosis:** confirmed via `adb logcat` on the actual device. `Intl.NumberFormat` worked — the hero temperature had already rendered fine — but `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` were both `undefined` on this Hermes build. This is exactly the risk `formatters.ts`'s own file header already flagged: "Node and Hermes do not always ship identical ICU data." That warning had never been tested against real hardware until now, because Jest runs on Node, and Node always has full ICU.
+**Resolution:** `formatDate`, `formatTime`, `formatWeekday`, and `formatRelativeTime` each check `typeof Intl.X === 'function'` before constructing it, and fall back to a hand-written implementation when it is missing — manual `HH:MM` padding, a hardcoded weekday/month name table, and manual English/Persian relative phrasing. The fallback is explicitly DEGRADED, not equivalent: it renders the Gregorian calendar rather than Jalali, since hand-implementing Persian/Jalali conversion is exactly the dependency CLAUDE.md §36 already weighed once for this file and rejected — a wrong-but-legible date beats a crashed screen, and is worth replacing the moment a build ships full ICU.
+**Tested by reproducing the exact gap**: `Object.defineProperty(Intl, 'DateTimeFormat', { value: undefined, … })` inside a dedicated `describe` block (a plain assignment does not type-check — the property is read-only on `Intl`'s own type), so all four fallbacks are asserted directly rather than trusted. Five new tests, including the English singular/plural boundary at exactly one unit.
+**Why 974 passing tests didn't catch this before today:** every one of them ran on Node. This is the second time in this phase that a real device found something the full suite could not — see entry 8's timezone gap for the first — for the same underlying reason both times: **the test environment and the runtime environment quietly disagreed about a platform capability, and nothing had ever pointed a test at the disagreement itself.**
 
 ### Verification — enforcement proven, not assumed
 
@@ -607,7 +614,7 @@ Two multi-file `cat <<'EOF'` blocks ended early, leaving one file missing and an
 | `core/i18n/` | `weather` namespace, English and Persian |
 | `core/errors/` | `asAppError` narrowing, needed at every query boundary |
 
-**972 tests.** Every component asserted in all four locale × theme combinations.
+**979 tests.** Every component asserted in all four locale × theme combinations.
 
 ### Problems encountered
 
@@ -700,6 +707,13 @@ That left rendering, and rendering turned out to have **no way to report anythin
 **What this did NOT do:** identify which of the three actually fired. That is the point — remotely, they were indistinguishable, and no amount of reading could separate them. The next build names its own failure instead.
 
 **The principle:** an app that cannot describe its own failure cannot be debugged remotely, and **the fallback path is the one path that is never exercised until it is the only one left**. It has to be the most conservative code in the project, not the least.
+
+#### 10. 🔴 Choosing a searched city saved it but never showed it
+**Symptom:** on device, searching a city, tapping a result, returning to a "Something went wrong" screen identical to the one the search was meant to escape.
+**Cause:** `LocationSearchScreen.handleSelect` called `saveLocation.mutate(result)` and `router.back()` — it never called `useSelectedLocationStore().select(id)`. The city was added to the saved list, but `selectedId` stayed `undefined`, so the home screen kept `followsDevice: true` and kept trying the device's GPS, which was still failing. The user searched specifically to route around a GPS problem and was routed straight back into it.
+**Resolution:** `handleSelect` now awaits `saveLocation.mutateAsync(result)` and selects the id it resolves to, navigating only on success. Awaited deliberately rather than selecting immediately: `mutate` returns before the write completes and the optimistic cache entry carries a temporary `optimistic-<timestamp>` id (CLAUDE.md §24 rule 3) — selecting that would point the home screen at an id nothing in the saved list will ever carry once the real one arrives. A failed save leaves the screen exactly where it was, since CLAUDE.md §22 rule 3 already rules out silently discarding the failure, and there is nothing elsewhere worth navigating to.
+**Verified on a real device**: GPS was failing (`Current location is unavailable`) with permission and location services both genuinely on — an indoor GPS-fix problem, not a code defect, confirmed separately with `adb shell dumpsys package` and `settings get secure location_mode`. Selecting a searched city was the intended way around exactly that condition, which is what exposed this.
+**Why it shipped:** no test exercised the search screen's selection at all — Phase 3 tested the row and the query hooks, never the composition that connects a selection to what the home screen shows. Same shape as entry 9's home-screen gap: a composition step untested is a composition step unverified.
 
 ### Verification
 

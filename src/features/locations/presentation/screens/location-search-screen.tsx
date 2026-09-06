@@ -16,6 +16,7 @@ import {
   useRecentSearches,
   useSaveLocation,
 } from '../hooks/use-locations';
+import { useSelectedLocationStore } from '../stores/selected-location-store';
 
 /** Long enough that a fast typist issues one request, short enough to feel instant. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -38,13 +39,34 @@ export function LocationSearchScreen() {
   const search = useCitySearch(debouncedQuery, i18n.language);
   const recent = useRecentSearches();
   const saveLocation = useSaveLocation();
+  const selectLocation = useSelectedLocationStore((state) => state.select);
 
   const results = search.data ?? [];
   const hasQuery = debouncedQuery.trim().length >= 2;
 
   const handleSelect = (result: LocationSearchResult): void => {
-    saveLocation.mutate(result);
-    router.back();
+    // AWAITED, not fired-and-forgotten: `mutate` returns immediately with the
+    // OPTIMISTIC entry (a temporary `optimistic-<timestamp>` id), and selecting
+    // that id would point the home screen at a location that never resolves,
+    // because nothing in the saved list ever carries it. `mutateAsync` resolves
+    // to the real, persisted `SavedLocation` this screen actually saved.
+    //
+    // This is also what was MISSING before: saving added the city to the list,
+    // but never switched the home screen to show it, so leaving GPS unresolved
+    // sent the user right back to the same "no location" screen they searched
+    // to get away from.
+    saveLocation.mutateAsync(result).then(
+      (saved) => {
+        selectLocation(saved.id);
+        router.back();
+      },
+      () => {
+        // A failed save already rolls its optimistic entry back (CLAUDE.md
+        // §24 rule 3) and leaves the list as it was. Staying on this screen
+        // lets the user see that and try again, rather than navigating away
+        // from a save that did not happen.
+      },
+    );
   };
 
   return (
