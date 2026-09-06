@@ -42,22 +42,27 @@ import { LOCALE_META, type Locale } from './locales';
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'] as const;
 
 /**
- * Run an `Intl`-backed formatter, falling back to `onDegraded` if it throws.
+ * Run an `Intl`-backed formatter, falling back to `onDegraded` if EITHER
+ * throws.
  *
- * A `typeof Intl.X === 'function'` pre-check was tried first and was not
- * enough: on a real device, `Intl.RelativeTimeFormat` existed as a
- * constructor, but calling `.format()` on the instance threw `TypeError:
- * undefined is not a function` — a different partial-ICU failure shape from
- * the missing-constructor one this file's fallbacks were originally built
- * for. Wrapping the actual call, not just checking the constructor exists,
- * degrades correctly regardless of which piece of a given Hermes build's ICU
- * is incomplete.
+ * Two different partial-ICU failure shapes have been observed on two
+ * different real Hermes builds: a missing constructor, and a constructor that
+ * exists but whose instance method throws `TypeError: undefined is not a
+ * function`. `onDegraded` is deliberately covered by the SAME try/catch as
+ * `run`, not left bare — the fallback path is the one path that must never be
+ * the thing that crashes the screen it exists to save, so it gets no less
+ * scrutiny than the primary path, only a plainer, allocation-light final
+ * fallback (`onLastResort`) below it that cannot itself fail.
  */
-function withIntl<T>(run: () => T, onDegraded: () => T): T {
+function withIntl<T>(run: () => T, onDegraded: () => T, onLastResort: () => T): T {
   try {
     return run();
   } catch {
-    return onDegraded();
+    try {
+      return onDegraded();
+    } catch {
+      return onLastResort();
+    }
   }
 }
 
@@ -216,6 +221,7 @@ export function formatDate(
       const rendered = `${date.getDate()} ${MONTH_NAMES[locale][date.getMonth()] ?? ''}`;
       return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
     },
+    () => `${date.getMonth() + 1}/${date.getDate()}`,
   );
 }
 
@@ -238,6 +244,7 @@ export function formatTime(date: Date, locale: Locale): string {
 
       return LOCALE_META[locale].usesPersianDigits ? toPersianDigits(rendered) : rendered;
     },
+    () => `${PAD2(date.getHours())}:${PAD2(date.getMinutes())}`,
   );
 }
 
@@ -252,6 +259,7 @@ export function formatWeekday(date: Date, locale: Locale, short = true): string 
       const names = WEEKDAY_NAMES[locale];
       return (short ? names.short : names.long)[date.getDay()] ?? '';
     },
+    () => WEEKDAY_NAMES[locale].short[date.getDay()] ?? '',
   );
 }
 
@@ -305,5 +313,8 @@ export function formatRelativeTime(
           ? `${count} ${unitName} ago`
           : `in ${count} ${unitName}`;
     },
+    // No locale-aware pluralisation, no Persian digits — just a number and a
+    // unit. This layer exists to be UN-FAILABLE, not polished.
+    () => `${String(Math.abs(value))} ${unit}${Math.abs(value) === 1 ? '' : 's'}`,
   );
 }
