@@ -1,4 +1,6 @@
 /* eslint-disable no-undef */
+import '@shopify/react-native-skia/jestSetup';
+
 /**
  * Jest setup.
  *
@@ -17,3 +19,9 @@ global.fetch = jest.fn(() => {
     'Real network calls are forbidden in tests (CLAUDE.md §26). Use MSW or a fake data source.',
   );
 });
+
+// ROADMAP Phase 6: Skia has no real GPU in a Node test environment, so the
+// package's OWN official CanvasKit-backed mock (imported above) stands in for
+// it. Hand-rolling this would mean re-deriving every prop shape
+// `<Canvas>`/`<Path>`/`<Circle>` accept — the maintainers already did that
+// work and keep it in step with the library, which a local mock would not.

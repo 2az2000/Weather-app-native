@@ -37,6 +37,18 @@ module.exports = {
   // implementation is used instead.
   resolver: 'react-native-worklets/jest/resolver',
 
+  // jest-expo's own `transformIgnorePatterns` (the negative-lookahead list
+  // below) does not know about `@shopify/react-native-skia` — its Jest mock
+  // (`lib/module/mock/index.js`, wired in `jest.setup.js`) ships ESM `import`
+  // syntax that Babel never gets a chance to transform, since Jest skips
+  // `node_modules` by default. Re-declaring the preset's list WITH Skia added
+  // is the supported way to extend it; Jest does not merge array options.
+  transformIgnorePatterns: [
+    '/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@shopify/react-native-skia))',
+    '/node_modules/react-native-reanimated/plugin/',
+    '/node_modules/@react-native/babel-preset/',
+  ],
+
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
   moduleNameMapper: {
