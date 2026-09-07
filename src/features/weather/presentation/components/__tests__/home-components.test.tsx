@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { I18nextProvider } from 'react-i18next';
 import type { ReactElement } from 'react';
 
@@ -78,6 +78,26 @@ describe.each(THEME_COMBINATIONS)('$name', (combination) => {
     // wrapper is an implementation choice, the label is the experience
     // (CLAUDE.md §26 rule 3).
     expect(screen.getByText(combination.isRTL ? 'اکنون' : 'Now')).toBeTruthy();
+  });
+
+  it('opens the hourly detail chart when a cell is pressed (ROADMAP Phase 6)', () => {
+    const onPress = jest.fn();
+
+    renderLocalised(
+      <HourlyStrip
+        points={[hourlyPoint(0), hourlyPoint(1), hourlyPoint(2)]}
+        locale={locale}
+        unit="celsius"
+        onPress={onPress}
+      />,
+      combination,
+    );
+
+    // Any cell opens the same 24h chart — see HourlyStripProps' own doc — so
+    // this only needs to prove ONE press reaches the callback, not that each
+    // cell forwards its own hour.
+    fireEvent.press(screen.getByText(combination.isRTL ? 'اکنون' : 'Now'));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('labels the first daily row "today"', () => {

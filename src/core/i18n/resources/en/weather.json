@@ -18,7 +18,8 @@
     "dewPoint": "Dew point",
     "uvIndex": "UV index",
     "cloudCover": "Cloud cover",
-    "precipitation": "Precipitation"
+    "precipitation": "Precipitation",
+    "temperature": "Temperature"
   },
   "uv": {
     "low": "Low",
@@ -69,6 +70,7 @@
     "metric": "{{label}}: {{value}}",
     "refresh": "Refresh the forecast",
     "changeLocation": "Change location",
-    "moonPhase": "{{phase}}, {{illumination}} illuminated"
+    "moonPhase": "{{phase}}, {{illumination}} illuminated",
+    "hourlyChart": "Temperature, {{low}} to {{high}} over the next 24 hours"
   }
 }

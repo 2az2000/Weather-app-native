@@ -110,6 +110,8 @@ export { forecastSnapshotsMigration } from './data/migrations/002-forecast-snaps
 
 // ── Presentation ─────────────────────────────────────────────────────────────
 export { HomeScreen } from './presentation/screens/home-screen';
+export { HourlyDetailScreen } from './presentation/screens/hourly-detail-screen';
+export type { HourlyDetailScreenParams } from './presentation/screens/hourly-detail-screen';
 export { weatherKeys } from './presentation/hooks/query-keys';
 export {
   useForecast,

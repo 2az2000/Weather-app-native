@@ -18,7 +18,8 @@
     "dewPoint": "نقطهٔ شبنم",
     "uvIndex": "شاخص فرابنفش",
     "cloudCover": "پوشش ابر",
-    "precipitation": "بارش"
+    "precipitation": "بارش",
+    "temperature": "دما"
   },
   "uv": {
     "low": "کم",
@@ -69,6 +70,7 @@
     "metric": "{{label}}: {{value}}",
     "refresh": "به‌روزرسانی پیش‌بینی",
     "changeLocation": "تغییر مکان",
-    "moonPhase": "{{phase}}، {{illumination}} روشن"
+    "moonPhase": "{{phase}}، {{illumination}} روشن",
+    "hourlyChart": "دما، از {{low}} تا {{high}} در ۲۴ ساعت آینده"
   }
 }

@@ -161,6 +161,19 @@ export function HomeScreen() {
               points={hourly.points.slice(0, 24)}
               locale={locale}
               unit={unit}
+              onPress={
+                coordinates === undefined
+                  ? undefined
+                  : () => {
+                      router.push({
+                        pathname: '/weather/hourly',
+                        params: {
+                          latitude: String(coordinates.latitude),
+                          longitude: String(coordinates.longitude),
+                        },
+                      });
+                    }
+              }
             />
           )}
 

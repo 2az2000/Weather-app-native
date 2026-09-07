@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { formatTemperature, formatTime, type Locale } from '@/core/i18n';
 import type { TemperatureUnit } from '@/features/settings';
-import { GlassSurface, Text } from '@/shared/ui';
+import { GlassSurface, PressableScale, Text } from '@/shared/ui';
 import { useTheme } from '@/theme';
 
 import type { HourlyPoint } from '../../domain';
@@ -36,9 +36,15 @@ export interface HourlyStripProps {
   readonly points: readonly HourlyPoint[];
   readonly locale: Locale;
   readonly unit: TemperatureUnit;
+  /**
+   * Any cell opens the SAME 24h detail chart (ROADMAP Phase 6) — the hour
+   * tapped is not threaded through, because the detail screen shows the whole
+   * window and starts on "now" regardless of which cell was pressed.
+   */
+  readonly onPress?: (() => void) | undefined;
 }
 
-export function HourlyStrip({ points, locale, unit }: HourlyStripProps) {
+export function HourlyStrip({ points, locale, unit, onPress }: HourlyStripProps) {
   const theme = useTheme();
   const { t } = useTranslation('weather');
 
@@ -51,7 +57,13 @@ export function HourlyStrip({ points, locale, unit }: HourlyStripProps) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: theme.spacing.base }}
         renderItem={({ item, index }) => (
-          <HourCell point={item} isFirst={index === 0} locale={locale} unit={unit} />
+          <HourCell
+            point={item}
+            isFirst={index === 0}
+            locale={locale}
+            unit={unit}
+            onPress={onPress}
+          />
         )}
       />
     </View>
@@ -63,13 +75,20 @@ interface HourCellProps {
   readonly isFirst: boolean;
   readonly locale: Locale;
   readonly unit: TemperatureUnit;
+  readonly onPress?: (() => void) | undefined;
 }
 
 /**
  * Memoised: this renders inside a scrolling list, which is exactly where
  * `React.memo` earns its cost (CLAUDE.md §21).
  */
-const HourCell = memo(function HourCell({ point, isFirst, locale, unit }: HourCellProps) {
+const HourCell = memo(function HourCell({
+  point,
+  isFirst,
+  locale,
+  unit,
+  onPress,
+}: HourCellProps) {
   const theme = useTheme();
   const { t } = useTranslation('weather');
 
@@ -78,29 +97,35 @@ const HourCell = memo(function HourCell({ point, isFirst, locale, unit }: HourCe
   const condition = t(`conditions.${point.condition}`);
 
   return (
-    <GlassSurface
-      padding="md"
-      radius="lg"
+    <PressableScale
+      onPress={onPress}
+      haptic
+      disabled={onPress === undefined}
+      accessibilityRole="button"
+      accessibilityLabel={t('a11y.hourlyPoint', { time, condition, temperature })}
       style={{
         // Logical margin: mirrors correctly in Persian. `marginRight` is banned
         // by lint (CLAUDE.md §19 rule 2).
         marginEnd: theme.spacing.sm,
-        minWidth: 72,
-        alignItems: 'center',
       }}
     >
-      <View
-        accessible
-        accessibilityLabel={t('a11y.hourlyPoint', { time, condition, temperature })}
-        style={{ alignItems: 'center', gap: theme.spacing.xs }}
+      <GlassSurface
+        padding="md"
+        radius="lg"
+        style={{
+          minWidth: 72,
+          alignItems: 'center',
+        }}
       >
-        <Text size="footnote" tone="onWeather" style={{ opacity: 0.85 }}>
-          {time}
-        </Text>
-        <Text size="callout" weight="semibold" tone="onWeather">
-          {temperature}
-        </Text>
-      </View>
-    </GlassSurface>
+        <View style={{ alignItems: 'center', gap: theme.spacing.xs }}>
+          <Text size="footnote" tone="onWeather" style={{ opacity: 0.85 }}>
+            {time}
+          </Text>
+          <Text size="callout" weight="semibold" tone="onWeather">
+            {temperature}
+          </Text>
+        </View>
+      </GlassSurface>
+    </PressableScale>
   );
 });

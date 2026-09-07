@@ -1,5 +1,5 @@
 /**
- * @jest-environment ../../../../../node_modules/@shopify/react-native-skia/jestEnv
+ * @jest-environment @shopify/react-native-skia/jestEnv
  *
  * Skia's own mock (`jestSetup.js`, wired globally in `jest.setup.js`) needs a
  * REAL CanvasKit WASM instance on `global.CanvasKit` to build paths against —
@@ -7,6 +7,14 @@
  * the environment for ONLY this file, via Skia's own `SkiaEnvironment`, rather
  * than changing `jest.config.js`'s global `testEnvironment` and paying a WASM
  * load on every one of the other 57+ suites that never touch a canvas.
+ *
+ * The bare package specifier (not a relative path) is deliberate: Jest
+ * resolves a docblock `@jest-environment` value against its OWN module
+ * resolver rather than the test file's directory, so a relative path that
+ * `require.resolve` accepts from this exact file can still fail here —
+ * observed firsthand when an identical relative path worked from one test
+ * file's directory and not from a deeper one. The package specifier has no
+ * directory depth to get wrong.
  */
 import { fireEvent, screen } from '@testing-library/react-native';
 
